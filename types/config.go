@@ -1,5 +1,9 @@
 package config
 
-type Configuration struct{
-	BotToken string
+// Configuration ...
+type Configuration struct {
+	BotToken        string
+	BindAddr        string
+	LogLevel        string
+	ConnectPostgres string
 }
