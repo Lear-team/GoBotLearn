@@ -39,3 +39,10 @@ type LetterRow struct {
 type StoreDB struct {
 	DB *sqlx.DB
 }
+
+// BotWork ...
+type BotWork struct {
+	BotWorkID   string `db:"botworkid"`
+	UserID      string `db:"userid"`
+	BotWorkFlag bool   `db:"botworkflag"`
+}

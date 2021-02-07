@@ -7,3 +7,12 @@ type Configuration struct {
 	LogLevel        string
 	ConnectPostgres string
 }
+
+// Commands ...
+type Commands struct {
+	StartBot     string
+	StopBot      string
+	CreateCode   string
+	EditCode     string
+	RegisterUser string
+}

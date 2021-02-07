@@ -454,6 +454,147 @@ func UpdateRefUserCode(codeR string, userR string, db *sqlx.DB) (*apitypes.RefUs
 	return refUserCode, err
 }
 
+// CheckingPigeonWork ...
+func CheckingPigeonWork(userN string, db *sqlx.DB) (bool, error) {
+
+	if err := db.Ping(); err != nil {
+		// log.Fatal(err)
+		return false, err
+	}
+
+	user, err := GetUserByName(userN, db)
+
+	if err != nil {
+		// log.Fatal(err)
+		return false, err
+	}
+
+	var botWork = []apitypes.BotWork{}
+	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
+
+	if err != nil {
+		// log.Fatal(err)
+		return false, err
+	}
+
+	if len(botWork) == 1 {
+		return botWork[0].BotWorkFlag, err
+	}
+
+	if len(botWork) > 1 {
+		log.Printf("Ошибка с флагом работы бота")
+		return false, err
+	}
+
+	return false, err
+}
+
+// StartPigeonWork ...
+func StartPigeonWork(userN string, db *sqlx.DB) error {
+	if err := db.Ping(); err != nil {
+		return err
+	}
+
+	user, err := GetUserByName(userN, db)
+
+	if err != nil {
+		return err
+	}
+
+	var botWork = []apitypes.BotWork{}
+	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
+
+	if err != nil {
+		return err
+	}
+
+	if len(botWork) == 0 {
+		err = CreatePigeonWorkFlag(userN, db)
+		if err != nil {
+			return err
+		}
+		err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
+	}
+
+	if len(botWork) == 1 {
+		tx := db.MustBegin()
+		tx.MustExec(`UPDATE prj_botwork botworkid = "$1" WHERE botworkflag = '$2'`,
+			botWork[0].BotWorkID, true)
+		tx.Commit()
+	}
+
+	return err
+}
+
+// StopPigeonWork ...
+func StopPigeonWork(userN string, db *sqlx.DB) error {
+	if err := db.Ping(); err != nil {
+		return err
+	}
+
+	user, err := GetUserByName(userN, db)
+
+	if err != nil {
+		return err
+	}
+
+	var botWork = []apitypes.BotWork{}
+	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
+
+	if err != nil {
+		return err
+	}
+
+	if len(botWork) == 1 {
+		tx := db.MustBegin()
+		tx.MustExec(`UPDATE prj_botwork botworkid = "$1" WHERE botworkflag = '$2'`,
+			botWork[0].BotWorkID, false)
+		tx.Commit()
+	}
+
+	if len(botWork) > 1 {
+		log.Printf("Больше двух флагов")
+		return err
+	}
+
+	return err
+}
+
+// CreatePigeonWorkFlag ...
+func CreatePigeonWorkFlag(userN string, db *sqlx.DB) error {
+	if err := db.Ping(); err != nil {
+		return err
+	}
+
+	user, err := GetUserByName(userN, db)
+
+	if err != nil {
+		return err
+	}
+
+	var botWork = []apitypes.BotWork{}
+	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
+
+	if err != nil {
+		return err
+	}
+
+	if len(botWork) == 0 {
+
+		uuidWithHyphen := uuid.New()
+		uuid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
+
+		tx := db.MustBegin()
+		tx.MustExec(`INSERT INTO prj_botwork ("botworkid", "userid", "botworkflag") VALUES ($1, $2, $3)`,
+			uuid, user.UserID, true)
+		tx.Commit()
+
+		return err
+	}
+	log.Printf("Флаг уже создан")
+	return err
+}
+
 //  протестировать API для работы с базой данных
 
 //  проверить добавление связи пользоватль - кодовое слово
