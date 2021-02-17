@@ -46,3 +46,11 @@ type BotWork struct {
 	UserID      string `db:"userid"`
 	BotWorkFlag bool   `db:"botworkflag"`
 }
+
+// LastUserCommand ...
+type LastUserCommand struct {
+	CommandID   string    `db:"commandid"`
+	UserID      string    `db:"userid"`
+	Command     string    `db:"command"`
+	DataCommand time.Time `db:"datacommand"`
+}

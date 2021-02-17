@@ -3,6 +3,7 @@ package sqlapi
 import (
 	"log"
 	"strings"
+	"time"
 
 	apitypes "GoBotPigeon/types/apitypes"
 
@@ -374,7 +375,7 @@ func DeleteRefUserCodeByUserName(userN string, db *sqlx.DB) (*apitypes.RefUserCo
 	}
 
 	tx := db.MustBegin()
-	tx.MustExec(`UPDATE ref_usercode codeid = "" WHERE keyid = '$1'`, refUserCode.KeyID)
+	tx.MustExec(`UPDATE ref_usercode SET codeid = $1 WHERE keyid = $2`, "", refUserCode.KeyID)
 	tx.Commit()
 
 	refUserCode, err = GetRefUserCodeByUserName(userN, db)
@@ -441,8 +442,7 @@ func UpdateRefUserCode(codeR string, userR string, db *sqlx.DB) (*apitypes.RefUs
 	}
 
 	tx := db.MustBegin()
-	tx.MustExec(`UPDATE ref_usercode codeid = "$1" WHERE keyid = '$2'`,
-		codeR, refUserCode.KeyID)
+	tx.MustExec(`UPDATE ref_usercode SET codeid = $1 WHERE keyid = $2`, code.CodeID, refUserCode.KeyID)
 	tx.Commit()
 
 	refUserCode, err = GetRefUserCodeByKeyID(refUserCode.KeyID, db)
@@ -508,19 +508,21 @@ func StartPigeonWork(userN string, db *sqlx.DB) error {
 		return err
 	}
 
+	if len(botWork) == 1 {
+		tx := db.MustBegin()
+		tx.MustExec("UPDATE prj_botwork SET botworkflag = $1  WHERE botworkid = $2 ", true, botWork[0].BotWorkID)
+		tx.Commit()
+	}
+
 	if len(botWork) == 0 {
 		err = CreatePigeonWorkFlag(userN, db)
 		if err != nil {
 			return err
 		}
 		err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
-	}
-
-	if len(botWork) == 1 {
-		tx := db.MustBegin()
-		tx.MustExec(`UPDATE prj_botwork botworkid = "$1" WHERE botworkflag = '$2'`,
-			botWork[0].BotWorkID, true)
-		tx.Commit()
+		if err != nil {
+			return err
+		}
 	}
 
 	return err
@@ -539,7 +541,7 @@ func StopPigeonWork(userN string, db *sqlx.DB) error {
 	}
 
 	var botWork = []apitypes.BotWork{}
-	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
+	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE userid = $1", user.UserID)
 
 	if err != nil {
 		return err
@@ -547,8 +549,7 @@ func StopPigeonWork(userN string, db *sqlx.DB) error {
 
 	if len(botWork) == 1 {
 		tx := db.MustBegin()
-		tx.MustExec(`UPDATE prj_botwork botworkid = "$1" WHERE botworkflag = '$2'`,
-			botWork[0].BotWorkID, false)
+		tx.MustExec("UPDATE prj_botwork SET botworkflag = $1 WHERE botworkid = $2", false, botWork[0].BotWorkID)
 		tx.Commit()
 	}
 
@@ -573,7 +574,7 @@ func CreatePigeonWorkFlag(userN string, db *sqlx.DB) error {
 	}
 
 	var botWork = []apitypes.BotWork{}
-	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
+	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE userid = $1", user.UserID)
 
 	if err != nil {
 		return err
@@ -595,10 +596,82 @@ func CreatePigeonWorkFlag(userN string, db *sqlx.DB) error {
 	return err
 }
 
-//  протестировать API для работы с базой данных
+// SetLastComandUser ...
+func SetLastComandUser(userN string, db *sqlx.DB, command string) error {
 
-//  проверить добавление связи пользоватль - кодовое слово
-//  проверить обновление связи пользователь - кодовое слово
+	if err := db.Ping(); err != nil {
+		return err
+	}
 
-//  добавить функцию сохранения сообщения с сайта
-//  добавить в тип сообщениня поле ДАТА  +
+	user, err := GetUserByName(userN, db)
+
+	if err != nil {
+		return err
+	}
+
+	uuidWithHyphen := uuid.New()
+	uuid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
+	today := time.Now()
+	tTime := today.Add(10 * time.Minute).Format("2006/1/2 15:04")
+	tx := db.MustBegin()
+
+	tx.MustExec(`INSERT INTO prj_lastusercommand ("commandid", "userid", "command", "datacommand") VALUES ($1, $2, $3, $4)`,
+		uuid, user.UserID, command, tTime)
+	tx.Commit()
+
+	return err
+}
+
+// GetLastCommandByUserName ...
+func GetLastCommandByUserName(userN string, db *sqlx.DB) (*apitypes.LastUserCommand, error) {
+
+	if err := db.Ping(); err != nil {
+		return nil, err
+	}
+
+	user, err := GetUserByName(userN, db)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if user == nil {
+		return nil, nil
+	}
+
+	var arrCommand = []apitypes.LastUserCommand{}
+
+	err = db.Select(&arrCommand, "SELECT * FROM prj_lastusercommand WHERE (userid = $1) ORDER BY datacommand DESC", user.UserID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(arrCommand) == 0 {
+		return nil, nil
+	}
+
+	return &arrCommand[0], nil
+}
+
+// DeleteLastCommand ...
+func DeleteLastCommand(userN string, command string, db *sqlx.DB) error {
+	if err := db.Ping(); err != nil {
+		return err
+	}
+
+	user, err := GetUserByName(userN, db)
+
+	if err != nil {
+		return err
+	}
+	tx := db.MustBegin()
+	tx.MustExec("DELETE FROM prj_lastusercommand WHERE userid = $1", user.UserID)
+	tx.Commit()
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
