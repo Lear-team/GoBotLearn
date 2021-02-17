@@ -17,4 +17,6 @@ type Commands struct {
 	EditCode     string
 	RegisterUser string
 	StartPigeon  string
+	AddNameBot   string
+	EditNameBot  string
 }
