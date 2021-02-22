@@ -262,42 +262,44 @@ func (b *BotSvc) offerRregister(message *tgbotapi.Message, bot *tgbotapi.BotAPI,
 }
 
 func (b *BotSvc) startRegisterUser(chatID int64, bot *tgbotapi.BotAPI, message *tgbotapi.Message) error {
-
-	err := b.buttonAddedNewUser(message, bot)
-	if err != nil {
+	if err := b.buttonAddedNewUser(message, bot); err != nil {
 		log.Printf(err.Error())
 		return err
 	}
-	// продолжение работы с юзером, предложить создать кодовое слово
-	err = b.buttonAddNameBot(message, bot)
 
-	if err != nil {
+	// продолжение работы с юзером, предложить создать кодовое слово
+	if err := b.buttonAddNameBot(message, bot); err != nil {
 		log.Printf(err.Error())
 	}
+
 	return nil
 }
 
 func (b *BotSvc) buttonsStartBotWork(chatID int64, bot *tgbotapi.BotAPI) error {
-
-	nameP := emoji.Sprint("Запустить работу сервиса?")
-
-	msg := tgbotapi.NewMessage(chatID, nameP)
-
-	startMessage := emoji.Sprint(b.commandsBot.StartBot)
-	changeMessage := emoji.Sprint(b.commandsBot.EditCode)
-	myKeyboardButtonStart := tgbotapi.KeyboardButton{Text: startMessage}
-	myKeyboardButtonStop := tgbotapi.KeyboardButton{Text: changeMessage}
-	arrKeyboardButton := [][]tgbotapi.KeyboardButton{{myKeyboardButtonStart, myKeyboardButtonStop}}
+	arrKeyboardButton := [][]tgbotapi.KeyboardButton{
+		{
+			tgbotapi.KeyboardButton{
+				Text: emoji.Sprint(b.commandsBot.StartBot),
+			},
+			tgbotapi.KeyboardButton{
+				Text: emoji.Sprint(b.commandsBot.EditCode),
+			},
+		},
+	}
 	replyKeyboardMarkup := tgbotapi.ReplyKeyboardMarkup{
 		Keyboard:        arrKeyboardButton,
 		Selective:       true,
 		OneTimeKeyboard: true,
 	}
 
+	msg := tgbotapi.NewMessage(chatID, emoji.Sprint("Запустить работу сервиса?"))
 	msg.ReplyMarkup = replyKeyboardMarkup
-	_, err := bot.Send(msg)
 
-	return err
+	if _, err := bot.Send(msg); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (b *BotSvc) buttonsStopBotWork(chatID int64, bot *tgbotapi.BotAPI) error {
