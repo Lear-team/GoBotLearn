@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // here
+	"github.com/pkg/errors"
 )
 
 // DB ...
@@ -575,8 +576,7 @@ func SetLastComandUser(userN string, db *sqlx.DB, command string) error {
 func GetLastCommandByUserName(userN string, db *sqlx.DB) (*apitypes.LastUserCommand, error) {
 
 	if err := db.Ping(); err != nil {
-		log.Println("GetLastCommandByUserName db.Ping failed with an error: ", err.Error())
-		return nil, err
+		return nil, errors.Wrap(err, "GetLastCommandByUserName db.Ping")
 	}
 
 	user, err := GetUserByName(userN, db)
