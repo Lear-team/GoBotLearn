@@ -1,7 +1,6 @@
 *.txt
 *keys.json
 *.adfs.json
-*.json
 *debug
 *.exe
 *.toml
