@@ -91,75 +91,15 @@ func processingCommands(message *tgbotapi.Message, bot *tgbotapi.BotAPI) error {
 	if verification && freshLastCommand {
 		err = verificationFreshLastCommand(message, bot, msg, lastCommand.Command)
 		if err != nil {
-			log.Printf(err.Error())
+			log.Println("verificationFreshLastCommand failed with an error: ", err.Error())
 			return err
 		}
 	} else if verification {
-		verificationPigeon, err := checkingPigeonID(message.From)
 
+		err := verificationWorkBot(message, bot, msg)
 		if err != nil {
-			log.Println("Checking Pigeon ID failed with an error: ", err.Error())
+			log.Println("verificationWorkBot failed with an error: ", err.Error())
 			return err
-		}
-
-		if !verificationPigeon {
-			err = buttonAddNameBot(message, bot)
-
-			if err != nil {
-				log.Println("Sending the message failed with an error: ", err.Error())
-				return err
-			}
-		} else if verificationPigeon {
-			checkingPigeonWork, err := sqlapi.CheckingPigeonWork(message.From.UserName, sqlapi.DB)
-
-			if err != nil {
-				log.Printf(err.Error())
-			}
-
-			if !checkingPigeonWork {
-
-				if message.Text == emoji.Sprint(commandsBot.StartBot) {
-					err = sqlapi.StartPigeonWork(message.From.UserName, sqlapi.DB)
-					if err != nil {
-						log.Printf(err.Error())
-					}
-
-					err = buttonsStopPigeonWork(msg.BaseChat.ChatID, bot)
-
-					if err != nil {
-						log.Printf(err.Error())
-					}
-				} else if message.Text == emoji.Sprint(commandsBot.EditCode) {
-					err = buttonEditNameBot(message, bot)
-
-					if err != nil {
-						log.Printf(err.Error())
-					}
-				}
-
-			} else if checkingPigeonWork && message.Text == emoji.Sprint(commandsBot.StopBot) {
-
-				err = sqlapi.StopPigeonWork(message.From.UserName, sqlapi.DB)
-				if err != nil {
-					log.Printf(err.Error())
-				}
-
-				err = buttonsStartPigeonWork(msg.BaseChat.ChatID, bot)
-				if err != nil {
-					log.Printf(err.Error())
-				}
-
-			} else if checkingPigeonWork {
-				err = buttonsStopPigeonWork(msg.BaseChat.ChatID, bot)
-
-				if err != nil {
-					log.Printf(err.Error())
-				}
-			}
-		}
-
-		if err != nil {
-			log.Printf(err.Error())
 		}
 
 	} else {
@@ -175,52 +115,157 @@ func processingCommands(message *tgbotapi.Message, bot *tgbotapi.BotAPI) error {
 
 func verificationFreshLastCommand(message *tgbotapi.Message, bot *tgbotapi.BotAPI, msg tgbotapi.MessageConfig, command string) error {
 	if command == commandsBot.AddNameBot {
-		result, err := addUserCode(bot, message)
+		err := commandAddNameBot(message, bot, msg)
+		if err != nil {
+			log.Printf(err.Error())
+			return err
+		}
+
+	} else if command == commandsBot.EditNameBot {
+		err := commandEditNameBot(message, bot, msg)
+		if err != nil {
+			log.Printf(err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
+func commandAddNameBot(message *tgbotapi.Message, bot *tgbotapi.BotAPI, msg tgbotapi.MessageConfig) error {
+	result, err := addUserCode(bot, message)
+
+	if err != nil {
+		log.Println("Bot name creation failed with an error: ", err.Error())
+		return err
+	}
+
+	if result {
+		err = buttonsStartBotWork(msg.BaseChat.ChatID, bot)
 
 		if err != nil {
 			log.Println("Bot name creation failed with an error: ", err.Error())
 			return err
 		}
-
-		if result {
-			err = buttonsStartPigeonWork(msg.BaseChat.ChatID, bot)
-
-			if err != nil {
-				log.Println("Bot name creation failed with an error: ", err.Error())
-				return err
-			}
-		} else {
-			err = buttonAddNameBot(message, bot)
-
-			if err != nil {
-				log.Println("Adding name bot failed with an error: ", err.Error())
-				return err
-			}
-		}
-	} else if command == commandsBot.EditNameBot {
-		result, err := editUserCode(bot, message)
+	} else {
+		err = buttonAddNameBot(message, bot)
 
 		if err != nil {
-			log.Println("Updating user code failed with an error: ", err.Error())
+			log.Println("Adding name bot failed with an error: ", err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
+func commandEditNameBot(message *tgbotapi.Message, bot *tgbotapi.BotAPI, msg tgbotapi.MessageConfig) error {
+	result, err := editUserCode(bot, message)
+
+	if err != nil {
+		log.Println("Updating user code failed with an error: ", err.Error())
+		return err
+	}
+
+	if result {
+		err = buttonsStartBotWork(msg.BaseChat.ChatID, bot)
+
+		if err != nil {
+			log.Println("Starting work failed with an error: ", err.Error())
+			return err
+		}
+	} else {
+		err = buttonAddNameBot(message, bot)
+
+		if err != nil {
+			log.Println("Adding name bot failed with an error: ", err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
+func verificationWorkBot(message *tgbotapi.Message, bot *tgbotapi.BotAPI, msg tgbotapi.MessageConfig) error {
+	checkingBotWork, err := sqlapi.CheckingPigeonWork(message.From.UserName, sqlapi.DB)
+
+	if err != nil {
+		log.Println("CheckingPigeonWork failed with an error: ", err.Error())
+		return err
+	}
+
+	if !checkingBotWork {
+
+		err = botDoNotWork(message, bot, msg)
+		if err != nil {
+			log.Println("botDoNotWork failed with an error: ", err.Error())
 			return err
 		}
 
-		if result {
-			err = buttonsStartPigeonWork(msg.BaseChat.ChatID, bot)
+	} else if checkingBotWork && message.Text == emoji.Sprint(commandsBot.StopBot) {
 
-			if err != nil {
-				log.Println("Starting work failed with an error: ", err.Error())
-				return err
-			}
-		} else {
-			err = buttonAddNameBot(message, bot)
+		err = stopBotWorking(message, bot, msg)
+		if err != nil {
+			log.Println("botDoNotWork failed with an error: ", err.Error())
+			return err
+		}
 
-			if err != nil {
-				log.Println("Adding name bot failed with an error: ", err.Error())
-				return err
-			}
+	} else if checkingBotWork {
+		err = botWork(bot, msg)
+		if err != nil {
+			log.Println("botWork failed with an error: ", err.Error())
+			return err
 		}
 	}
+
+	return err
+}
+
+func botDoNotWork(message *tgbotapi.Message, bot *tgbotapi.BotAPI, msg tgbotapi.MessageConfig) error {
+	if message.Text == emoji.Sprint(commandsBot.StartBot) {
+		err := sqlapi.StartPigeonWork(message.From.UserName, sqlapi.DB)
+		if err != nil {
+			log.Println("StartPigeonWork failed with an error: ", err.Error())
+			return err
+		}
+
+		err = buttonsStopBotWork(msg.BaseChat.ChatID, bot)
+
+		if err != nil {
+			log.Println("buttonsStopBotWork failed with an error: ", err.Error())
+			return err
+		}
+	} else if message.Text == emoji.Sprint(commandsBot.EditCode) {
+		err := buttonEditNameBot(message, bot)
+
+		if err != nil {
+			log.Println("buttonEditNameBot failed with an error: ", err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
+func botWork(bot *tgbotapi.BotAPI, msg tgbotapi.MessageConfig) error {
+	err := buttonsStopBotWork(msg.BaseChat.ChatID, bot)
+
+	if err != nil {
+		log.Println("buttonsStopBotWork failed with an error: ", err.Error())
+		return err
+	}
+	return nil
+}
+
+func stopBotWorking(message *tgbotapi.Message, bot *tgbotapi.BotAPI, msg tgbotapi.MessageConfig) error {
+	err := sqlapi.StopPigeonWork(message.From.UserName, sqlapi.DB)
+	if err != nil {
+		log.Println("StopPigeonWork failed with an error: ", err.Error())
+		return err
+	}
+
+	err = buttonsStartBotWork(msg.BaseChat.ChatID, bot)
+	if err != nil {
+		log.Println("buttonsStartBotWork failed with an error: ", err.Error())
+		return err
+	}
+
 	return nil
 }
 
@@ -259,7 +304,7 @@ func startRegisterUser(chatID int64, bot *tgbotapi.BotAPI, message *tgbotapi.Mes
 	return nil
 }
 
-func buttonsStartPigeonWork(chatID int64, bot *tgbotapi.BotAPI) error {
+func buttonsStartBotWork(chatID int64, bot *tgbotapi.BotAPI) error {
 
 	nameP := emoji.Sprint("Запустить работу сервиса?")
 
@@ -282,7 +327,7 @@ func buttonsStartPigeonWork(chatID int64, bot *tgbotapi.BotAPI) error {
 	return err
 }
 
-func buttonsStopPigeonWork(chatID int64, bot *tgbotapi.BotAPI) error {
+func buttonsStopBotWork(chatID int64, bot *tgbotapi.BotAPI) error {
 	msg := tgbotapi.NewMessage(chatID, "Бот запущен.")
 
 	stopMessage := emoji.Sprint(commandsBot.StopBot)

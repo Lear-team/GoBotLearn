@@ -20,12 +20,12 @@ func ConnectDb(databaseURL string) (err error) {
 
 	DB, err = sqlx.Open("postgres", databaseURL)
 	if err != nil {
-		// log.Fatal(err)
+		log.Println("sqlx.Open failed with an error: ", err.Error())
 		return err
 	}
 
 	if err := DB.Ping(); err != nil {
-		// log.Fatal(err)
+		log.Println("DB.Ping failed with an error: ", err.Error())
 		return err
 	}
 
@@ -42,14 +42,14 @@ func GetUserByID(idUser string, db *sqlx.DB) (*apitypes.UserRow, error) {
 	userRow := []apitypes.UserRow{}
 
 	if err := db.Ping(); err != nil {
-		// log.Fatal(err)
+		log.Println("DB.Ping failed with an error: ", err.Error())
 		return nil, err
 	}
 
 	err := db.Select(&userRow, "SELECT * FROM prj_user WHERE (userid = $1)", idUser)
 
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("GetUserByID db.Select failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -65,14 +65,14 @@ func GetUserByName(nameUser string, db *sqlx.DB) (*apitypes.UserRow, error) {
 
 	userRow := []apitypes.UserRow{}
 	if err := db.Ping(); err != nil {
-		// log.Fatal(err)
+		log.Println("GetUserByName db.Ping failed with an error: ", err.Error())
 		return nil, err
 	}
 
 	err := db.Select(&userRow, "SELECT * FROM prj_user WHERE (nameuser = $1)", nameUser)
 
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("GetUserByName db.Select failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -88,14 +88,14 @@ func GetCodeByID(idCode string, db *sqlx.DB) (*apitypes.CodeRow, error) {
 
 	codeRow := []apitypes.CodeRow{}
 	if err := db.Ping(); err != nil {
-		// log.Fatal(err)
+		log.Println("GetCodeByID db.Ping failed with an error: ", err.Error())
 		return nil, err
 	}
 
 	err := db.Select(&codeRow, "SELECT * FROM prj_code WHERE (codeid = $1)", idCode)
 
 	if err != nil {
-		// log.Fatal(err)
+		log.Println("GetCodeByID db.Select failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -111,14 +111,14 @@ func GetCodeByCode(codeCode string, db *sqlx.DB) (*apitypes.CodeRow, error) {
 
 	codeRow := []apitypes.CodeRow{}
 	if err := db.Ping(); err != nil {
-		// log.Fatal(err)
+		log.Println("GetCodeByCode db.Ping failed with an error: ", err.Error())
 		return nil, err
 	}
 
 	err := db.Select(&codeRow, "SELECT * FROM prj_code WHERE (code = $1)", codeCode)
 
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("GetCodeByCode db.Select failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -133,24 +133,20 @@ func GetCodeByCode(codeCode string, db *sqlx.DB) (*apitypes.CodeRow, error) {
 func AddNewUser(userN string, userID string, chatID string, db *sqlx.DB) (*apitypes.UserRow, error) {
 
 	if err := db.Ping(); err != nil {
-		//log.Fatal(err)
+		log.Println("AddNewUser db.Ping failed with an error: ", err.Error())
 		return nil, err
 	}
 
-	// user, err := GetUserByName(userN, db)
 	user, err := GetUserByID(userID, db)
 
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("AddNewUser GetUserByID failed with an error: ", err.Error())
 		return nil, err
 	}
 
 	if user != nil {
 		return nil, err
 	}
-
-	// uuidWithHyphen := uuid.New()
-	// uuid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
 
 	tx := db.MustBegin()
 	tx.MustExec(`INSERT INTO prj_user ("userid", "nameuser", "chatid") VALUES ($1, $2, $3)`,
@@ -159,7 +155,7 @@ func AddNewUser(userN string, userID string, chatID string, db *sqlx.DB) (*apity
 
 	user, err = GetUserByID(userID, db)
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("AddNewUser GetUserByID failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -170,13 +166,13 @@ func AddNewUser(userN string, userID string, chatID string, db *sqlx.DB) (*apity
 func AddNewCode(codeN string, db *sqlx.DB) (*apitypes.CodeRow, error) {
 
 	if err := db.Ping(); err != nil {
-		// log.Fatal(err)
+		log.Println("AddNewCode db.Ping failed with an error: ", err.Error())
 		return nil, err
 	}
 
 	code, err := GetCodeByCode(codeN, db)
 	if err != nil {
-		// log.Fatal(err)
+		log.Println("AddNewCode GetCodeByCode failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -194,7 +190,7 @@ func AddNewCode(codeN string, db *sqlx.DB) (*apitypes.CodeRow, error) {
 
 	code, err = GetCodeByID(uuid, db)
 	if err != nil {
-		// log.Fatal(err)
+		log.Println("AddNewCode GetCodeByID failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -203,11 +199,10 @@ func AddNewCode(codeN string, db *sqlx.DB) (*apitypes.CodeRow, error) {
 
 // AddRefUserCode ...
 func AddRefUserCode(codeR string, userIDR string, db *sqlx.DB) (*apitypes.RefUserCode, error) {
-	// var user apitypes.UserRow
 	var refUserCode = &apitypes.RefUserCode{}
 
 	if err := db.Ping(); err != nil {
-		// log.Fatal(err)
+		log.Println("AddRefUserCode db.Ping failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -225,7 +220,7 @@ func AddRefUserCode(codeR string, userIDR string, db *sqlx.DB) (*apitypes.RefUse
 
 	refUserCode, err = GetRefUserCodeByUserName(user.NameUser, db)
 	if err != nil {
-		// log.Fatal(err)
+		log.Println("AddRefUserCode GetRefUserCodeByUserName failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -236,7 +231,7 @@ func AddRefUserCode(codeR string, userIDR string, db *sqlx.DB) (*apitypes.RefUse
 
 	code, err := GetCodeByCode(codeR, db)
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("AddRefUserCode GetCodeByCode failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -245,7 +240,7 @@ func AddRefUserCode(codeR string, userIDR string, db *sqlx.DB) (*apitypes.RefUse
 	}
 
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("AddRefUserCode AddNewCode failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -264,7 +259,7 @@ func AddRefUserCode(codeR string, userIDR string, db *sqlx.DB) (*apitypes.RefUse
 
 	refUserCode, err = GetRefUserCodeByKeyID(uuid, db)
 	if err != nil {
-		// log.Fatal(err)
+		log.Println("AddRefUserCode GetRefUserCodeByKeyID failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -275,7 +270,7 @@ func AddRefUserCode(codeR string, userIDR string, db *sqlx.DB) (*apitypes.RefUse
 func GetRefUserCodeByKeyID(keyID string, db *sqlx.DB) (*apitypes.RefUserCode, error) {
 
 	if err := db.Ping(); err != nil {
-		//log.Fatal(err)
+		log.Println("GetRefUserCodeByKeyID db.Ping failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -283,7 +278,7 @@ func GetRefUserCodeByKeyID(keyID string, db *sqlx.DB) (*apitypes.RefUserCode, er
 	err := db.Select(&refUserCode, "SELECT * FROM ref_usercode WHERE (keyid = $1)", keyID)
 
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("GetRefUserCodeByKeyID db.Select failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -298,14 +293,14 @@ func GetRefUserCodeByKeyID(keyID string, db *sqlx.DB) (*apitypes.RefUserCode, er
 func GetRefUserCodeByUserName(userN string, db *sqlx.DB) (*apitypes.RefUserCode, error) {
 
 	if err := db.Ping(); err != nil {
-		// log.Fatal(err)
+		log.Println("GetRefUserCodeByUserName db.Ping failed with an error: ", err.Error())
 		return nil, err
 	}
 
 	user, err := GetUserByName(userN, db)
 
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("GetRefUserCodeByUserName GetUserByName failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -318,7 +313,7 @@ func GetRefUserCodeByUserName(userN string, db *sqlx.DB) (*apitypes.RefUserCode,
 	err = db.Select(&rowUserCode, "SELECT * FROM ref_usercode WHERE (userid = $1)", string(user.UserID))
 
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("GetRefUserCodeByUserName db.Select failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -329,78 +324,19 @@ func GetRefUserCodeByUserName(userN string, db *sqlx.DB) (*apitypes.RefUserCode,
 	return nil, err
 }
 
-// CheckRefUserCode ...
-func CheckRefUserCode(codeID string, userID string, db *sqlx.DB) (bool, error) {
-
-	if err := db.Ping(); err != nil {
-		// log.Fatal(err)
-		return false, err
-	}
-
-	refUserCode := []apitypes.RefUserCode{}
-	err := db.Select(&refUserCode, "SELECT * FROM ref_usercode WHERE (userid = $1 AND codeid = $2)", userID, codeID)
-
-	if err != nil {
-		// log.Fatal(err)
-		return false, err
-	}
-
-	if len(refUserCode) == 1 {
-		return true, err
-	}
-
-	if len(refUserCode) > 1 {
-		log.Printf("Ошибка в связке Пользователь-Кодовое слово")
-		return false, err
-	}
-
-	return false, err
-}
-
-// DeleteRefUserCodeByUserName ...
-func DeleteRefUserCodeByUserName(userN string, db *sqlx.DB) (*apitypes.RefUserCode, error) {
-
-	var refUserCode = &apitypes.RefUserCode{}
-
-	if err := db.Ping(); err != nil {
-		// log.Fatal(err)
-		return nil, err
-	}
-
-	refUserCode, err := GetRefUserCodeByUserName(userN, db)
-
-	if err != nil {
-		//log.Fatal(err)
-		return nil, err
-	}
-
-	tx := db.MustBegin()
-	tx.MustExec(`UPDATE ref_usercode SET codeid = $1 WHERE keyid = $2`, "", refUserCode.KeyID)
-	tx.Commit()
-
-	refUserCode, err = GetRefUserCodeByUserName(userN, db)
-
-	if refUserCode != nil {
-		log.Printf("Удалить связь с кодовым словом не удалось")
-		return nil, err
-	}
-
-	return refUserCode, err
-}
-
 // UpdateRefUserCode ...
 func UpdateRefUserCode(codeR string, userR string, db *sqlx.DB) (*apitypes.RefUserCode, error) {
 	var refUserCode = &apitypes.RefUserCode{}
 
 	if err := db.Ping(); err != nil {
-		//log.Fatal(err)
+		log.Println("UpdateRefUserCode db.Ping failed with an error: ", err.Error())
 		return nil, err
 	}
 
 	user, err := GetUserByName(userR, db)
 
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("UpdateRefUserCode GetUserByName failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -411,13 +347,13 @@ func UpdateRefUserCode(codeR string, userR string, db *sqlx.DB) (*apitypes.RefUs
 
 	refUserCode, err = GetRefUserCodeByUserName(user.NameUser, db)
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("UpdateRefUserCode GetRefUserCodeByUserName failed with an error: ", err.Error())
 		return nil, err
 	}
 
 	code, err := GetCodeByCode(codeR, db)
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("UpdateRefUserCode GetCodeByCode failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -426,7 +362,7 @@ func UpdateRefUserCode(codeR string, userR string, db *sqlx.DB) (*apitypes.RefUs
 	}
 
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("UpdateRefUserCode AddNewCode failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -435,7 +371,7 @@ func UpdateRefUserCode(codeR string, userR string, db *sqlx.DB) (*apitypes.RefUs
 		refUserCode, err = AddRefUserCode(codeR, userR, db)
 
 		if err != nil {
-			//log.Fatal(err)
+			log.Println("UpdateRefUserCode AddRefUserCode failed with an error: ", err.Error())
 			return nil, err
 		}
 		return refUserCode, err
@@ -447,7 +383,7 @@ func UpdateRefUserCode(codeR string, userR string, db *sqlx.DB) (*apitypes.RefUs
 
 	refUserCode, err = GetRefUserCodeByKeyID(refUserCode.KeyID, db)
 	if err != nil {
-		//log.Fatal(err)
+		log.Println("UpdateRefUserCode GetRefUserCodeByKeyID failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -458,14 +394,14 @@ func UpdateRefUserCode(codeR string, userR string, db *sqlx.DB) (*apitypes.RefUs
 func CheckingPigeonWork(userN string, db *sqlx.DB) (bool, error) {
 
 	if err := db.Ping(); err != nil {
-		// log.Fatal(err)
+		log.Println("CheckingPigeonWork db.Ping failed with an error: ", err.Error())
 		return false, err
 	}
 
 	user, err := GetUserByName(userN, db)
 
 	if err != nil {
-		// log.Fatal(err)
+		log.Println("CheckingPigeonWork GetUserByName failed with an error: ", err.Error())
 		return false, err
 	}
 
@@ -473,7 +409,7 @@ func CheckingPigeonWork(userN string, db *sqlx.DB) (bool, error) {
 	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
 
 	if err != nil {
-		// log.Fatal(err)
+		log.Println("CheckingPigeonWork db.Select failed with an error: ", err.Error())
 		return false, err
 	}
 
@@ -492,12 +428,14 @@ func CheckingPigeonWork(userN string, db *sqlx.DB) (bool, error) {
 // StartPigeonWork ...
 func StartPigeonWork(userN string, db *sqlx.DB) error {
 	if err := db.Ping(); err != nil {
+		log.Println("StartPigeonWork db.Ping failed with an error: ", err.Error())
 		return err
 	}
 
 	user, err := GetUserByName(userN, db)
 
 	if err != nil {
+		log.Println("StartPigeonWork GetUserByName failed with an error: ", err.Error())
 		return err
 	}
 
@@ -505,6 +443,7 @@ func StartPigeonWork(userN string, db *sqlx.DB) error {
 	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
 
 	if err != nil {
+		log.Println("StartPigeonWork db.Select failed with an error: ", err.Error())
 		return err
 	}
 
@@ -517,10 +456,12 @@ func StartPigeonWork(userN string, db *sqlx.DB) error {
 	if len(botWork) == 0 {
 		err = CreatePigeonWorkFlag(userN, db)
 		if err != nil {
+			log.Println("StartPigeonWork CreatePigeonWorkFlag failed with an error: ", err.Error())
 			return err
 		}
 		err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
 		if err != nil {
+			log.Println("StartPigeonWork db.Select failed with an error: ", err.Error())
 			return err
 		}
 	}
@@ -531,12 +472,14 @@ func StartPigeonWork(userN string, db *sqlx.DB) error {
 // StopPigeonWork ...
 func StopPigeonWork(userN string, db *sqlx.DB) error {
 	if err := db.Ping(); err != nil {
+		log.Println("StopPigeonWork db.Ping failed with an error: ", err.Error())
 		return err
 	}
 
 	user, err := GetUserByName(userN, db)
 
 	if err != nil {
+		log.Println("StopPigeonWork GetUserByName failed with an error: ", err.Error())
 		return err
 	}
 
@@ -544,6 +487,7 @@ func StopPigeonWork(userN string, db *sqlx.DB) error {
 	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE userid = $1", user.UserID)
 
 	if err != nil {
+		log.Println("StopPigeonWork db.Select failed with an error: ", err.Error())
 		return err
 	}
 
@@ -564,12 +508,14 @@ func StopPigeonWork(userN string, db *sqlx.DB) error {
 // CreatePigeonWorkFlag ...
 func CreatePigeonWorkFlag(userN string, db *sqlx.DB) error {
 	if err := db.Ping(); err != nil {
+		log.Println("CreatePigeonWorkFlag db.Ping failed with an error: ", err.Error())
 		return err
 	}
 
 	user, err := GetUserByName(userN, db)
 
 	if err != nil {
+		log.Println("CreatePigeonWorkFlag GetUserByName failed with an error: ", err.Error())
 		return err
 	}
 
@@ -577,6 +523,7 @@ func CreatePigeonWorkFlag(userN string, db *sqlx.DB) error {
 	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE userid = $1", user.UserID)
 
 	if err != nil {
+		log.Println("CreatePigeonWorkFlag db.Select failed with an error: ", err.Error())
 		return err
 	}
 
@@ -600,12 +547,14 @@ func CreatePigeonWorkFlag(userN string, db *sqlx.DB) error {
 func SetLastComandUser(userN string, db *sqlx.DB, command string) error {
 
 	if err := db.Ping(); err != nil {
+		log.Println("SetLastComandUser db.Ping failed with an error: ", err.Error())
 		return err
 	}
 
 	user, err := GetUserByName(userN, db)
 
 	if err != nil {
+		log.Println("SetLastComandUser GetUserByName failed with an error: ", err.Error())
 		return err
 	}
 
@@ -626,12 +575,14 @@ func SetLastComandUser(userN string, db *sqlx.DB, command string) error {
 func GetLastCommandByUserName(userN string, db *sqlx.DB) (*apitypes.LastUserCommand, error) {
 
 	if err := db.Ping(); err != nil {
+		log.Println("GetLastCommandByUserName db.Ping failed with an error: ", err.Error())
 		return nil, err
 	}
 
 	user, err := GetUserByName(userN, db)
 
 	if err != nil {
+		log.Println("GetLastCommandByUserName GetUserByName failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -644,6 +595,7 @@ func GetLastCommandByUserName(userN string, db *sqlx.DB) (*apitypes.LastUserComm
 	err = db.Select(&arrCommand, "SELECT * FROM prj_lastusercommand WHERE (userid = $1) ORDER BY datacommand DESC", user.UserID)
 
 	if err != nil {
+		log.Println("GetLastCommandByUserName db.Select failed with an error: ", err.Error())
 		return nil, err
 	}
 
@@ -657,21 +609,19 @@ func GetLastCommandByUserName(userN string, db *sqlx.DB) (*apitypes.LastUserComm
 // DeleteLastCommand ...
 func DeleteLastCommand(userN string, command string, db *sqlx.DB) error {
 	if err := db.Ping(); err != nil {
+		log.Println("DeleteLastCommand db.Ping failed with an error: ", err.Error())
 		return err
 	}
 
 	user, err := GetUserByName(userN, db)
 
 	if err != nil {
+		log.Println("DeleteLastCommand GetUserByNamefailed with an error: ", err.Error())
 		return err
 	}
 	tx := db.MustBegin()
 	tx.MustExec("DELETE FROM prj_lastusercommand WHERE userid = $1", user.UserID)
 	tx.Commit()
-
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
