@@ -24,6 +24,9 @@ func (api *API) CheckingPigeonWork(userN string) (bool, error) {
 	if err != nil {
 		return false, errors.Wrap(err, "SELECT * FROM prj_botwork failed")
 	}
+	if len(botWork) == 0 {
+		return false, err
+	}
 
 	return botWork[0].BotWorkFlag, err
 }
