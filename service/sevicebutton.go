@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"log"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
@@ -49,7 +50,7 @@ func (b *BotSvc) buttonAddNameBot(msg *tgbotapi.Message, bot *tgbotapi.BotAPI) e
 		return errors.Wrap(err, "Sending the message failed")
 	}
 
-	err = b.storage.SetLastComandUser(msg.From.UserName, b.commandsBot.AddNameBot)
+	err = b.storage.SetLastComandUser(context.Background(), msg.From.UserName, b.commandsBot.AddNameBot)
 	if err != nil {
 		return errors.Wrap(err, "SetLastComandUser failed")
 	}
@@ -70,7 +71,7 @@ func (b *BotSvc) buttonEditNameBot(msg *tgbotapi.Message, bot *tgbotapi.BotAPI) 
 		return errors.Wrap(err, "Sending the message failed")
 	}
 
-	err = b.storage.SetLastComandUser(msg.From.UserName, b.commandsBot.EditNameBot)
+	err = b.storage.SetLastComandUser(context.Background(), msg.From.UserName, b.commandsBot.EditNameBot)
 	if err != nil {
 		return errors.Wrap(err, "SetLastComandUser failed")
 	}

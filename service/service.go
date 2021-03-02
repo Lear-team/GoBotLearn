@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"log"
 	"strconv"
 	"unicode/utf8"
@@ -15,18 +16,18 @@ import (
 
 // Storage ...
 type Storage interface {
-	GetLastCommandByUserName(usename string) (*apitypes.LastUserCommand, error)
-	CheckingPigeonWork(userN string) (bool, error)
-	StopPigeonWork(userN string) error
-	GetUserByID(idUser string) (*apitypes.UserRow, error)
-	StartPigeonWork(userN string) error
-	SetLastComandUser(userN string, command string) error
-	AddNewUser(userN, userID, chatID string) (*apitypes.UserRow, error)
-	AddNewCode(codeN string) (*apitypes.CodeRow, error)
-	AddRefUserCode(codeR string, userIDR string) (*apitypes.RefUserCode, error)
-	UpdateRefUserCode(codeR string, userR string) (*apitypes.RefUserCode, error)
-	DeleteLastCommand(userN string, command string) error
-	GetRefUserCodeByUserName(userN string) (*apitypes.RefUserCode, error)
+	GetLastCommandByUserName(ctx context.Context, usename string) (*apitypes.LastUserCommand, error)
+	CheckingPigeonWork(ctx context.Context, userN string) (bool, error)
+	StopPigeonWork(ctx context.Context, userN string) error
+	GetUserByID(ctx context.Context, idUser string) (*apitypes.UserRow, error)
+	StartPigeonWork(ctx context.Context, userN string) error
+	SetLastComandUser(ctx context.Context, userN string, command string) error
+	AddNewUser(ctx context.Context, userN, userID, chatID string) (*apitypes.UserRow, error)
+	AddNewCode(ctx context.Context, codeN string) (*apitypes.CodeRow, error)
+	AddRefUserCode(ctx context.Context, codeR string, userIDR string) (*apitypes.RefUserCode, error)
+	UpdateRefUserCode(ctx context.Context, codeR string, userR string) (*apitypes.RefUserCode, error)
+	DeleteLastCommand(ctx context.Context, userId string, command string) error
+	GetRefUserCodeByUserName(ctx context.Context, userN string) (*apitypes.RefUserCode, error)
 }
 
 // BotSvc ...
@@ -136,7 +137,7 @@ func (b *BotSvc) commandEditNameBot(message *tgbotapi.Message, bot *tgbotapi.Bot
 
 func (b *BotSvc) botDoNotWork(message *tgbotapi.Message, bot *tgbotapi.BotAPI, msg tgbotapi.MessageConfig) error {
 	if message.Text == emoji.Sprint(b.commandsBot.StartBot) {
-		err := b.storage.StartPigeonWork(message.From.UserName)
+		err := b.storage.StartPigeonWork(context.Background(), message.From.UserName)
 		if err != nil {
 			return errors.Wrap(err, "StartPigeonWork failed")
 		}
@@ -157,7 +158,7 @@ func (b *BotSvc) botDoNotWork(message *tgbotapi.Message, bot *tgbotapi.BotAPI, m
 }
 
 func (b *BotSvc) stopBotWorking(message *tgbotapi.Message, bot *tgbotapi.BotAPI, msg tgbotapi.MessageConfig) error {
-	err := b.storage.StopPigeonWork(message.From.UserName)
+	err := b.storage.StopPigeonWork(context.Background(), message.From.UserName)
 	if err != nil {
 		return errors.Wrap(err, "StopPigeonWork failed")
 	}
@@ -214,7 +215,7 @@ func (b *BotSvc) addUserCode(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (b
 		}
 
 		if refUP == true {
-			err = b.storage.DeleteLastCommand(message.From.UserName, b.commandsBot.AddNameBot)
+			err = b.storage.DeleteLastCommand(context.Background(), strconv.Itoa(message.From.ID), b.commandsBot.AddNameBot)
 			if err != nil {
 				return false, errors.Wrap(err, "Delete last command name  failed")
 			}
@@ -244,7 +245,7 @@ func (b *BotSvc) editUserCode(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (
 		}
 
 		if refUP == true {
-			err = b.storage.DeleteLastCommand(message.From.UserName, b.commandsBot.EditNameBot)
+			err = b.storage.DeleteLastCommand(context.Background(), strconv.Itoa(message.From.ID), b.commandsBot.EditNameBot)
 			if err != nil {
 				return false, errors.Wrap(err, "Delete last command failed")
 			}
@@ -263,9 +264,10 @@ func (b *BotSvc) editUserCode(bot *tgbotapi.BotAPI, message *tgbotapi.Message) (
 
 func (b *BotSvc) saveNewUser(msg *tgbotapi.Message) (bool, error) {
 
-	userInit, err := b.storage.AddNewUser(msg.From.UserName,
+	userInit, err := b.storage.AddNewUser(context.Background(),
+		msg.From.UserName,
 		strconv.Itoa(msg.From.ID),
-		strconv.Itoa(msg.From.ID))
+		strconv.FormatInt(msg.Chat.ID, 10))
 	if err != nil {
 		return false, errors.Wrap(err, "Adding new user failed")
 	}
@@ -278,7 +280,7 @@ func (b *BotSvc) saveNewUser(msg *tgbotapi.Message) (bool, error) {
 }
 
 func (b *BotSvc) saveRefUserCode(msg *tgbotapi.Message) (bool, error) {
-	botName, err := b.storage.AddNewCode(msg.Text)
+	botName, err := b.storage.AddNewCode(context.Background(), msg.Text)
 
 	if err != nil {
 		return false, errors.Wrap(err, "Adding new code failed")
@@ -287,7 +289,7 @@ func (b *BotSvc) saveRefUserCode(msg *tgbotapi.Message) (bool, error) {
 		return false, nil
 	}
 
-	addRefUserCode, err := b.storage.AddRefUserCode(botName.Code, strconv.Itoa(msg.From.ID))
+	addRefUserCode, err := b.storage.AddRefUserCode(context.Background(), botName.Code, strconv.Itoa(msg.From.ID))
 
 	if err != nil {
 		return false, errors.Wrap(err, "Adding RefUserCode failed")
@@ -300,7 +302,7 @@ func (b *BotSvc) saveRefUserCode(msg *tgbotapi.Message) (bool, error) {
 }
 
 func (b *BotSvc) updateRefUserCode(msg *tgbotapi.Message) (bool, error) {
-	update, err := b.storage.UpdateRefUserCode(msg.Text, msg.From.UserName)
+	update, err := b.storage.UpdateRefUserCode(context.Background(), msg.Text, msg.From.UserName)
 
 	if err != nil {
 		return false, errors.Wrap(err, "Updating RefUserCode failed")

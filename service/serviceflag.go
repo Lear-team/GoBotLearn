@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strconv"
 	"time"
 
@@ -21,7 +22,7 @@ func (b *BotSvc) GetVerificationFlags(message *tgbotapi.Message) (types.Verifica
 		return verificationFlags, errors.Wrap(err, "User verification failed")
 	}
 
-	lastCommand, err := b.storage.GetLastCommandByUserName(message.From.UserName)
+	lastCommand, err := b.storage.GetLastCommandByUserName(context.Background(), message.From.UserName)
 	if err != nil {
 		return verificationFlags, errors.Wrap(err, "Getting the last command failed")
 	}
@@ -40,17 +41,13 @@ func (b *BotSvc) GetVerificationFlags(message *tgbotapi.Message) (types.Verifica
 
 func (b *BotSvc) verificationUser(user *tgbotapi.User) (bool, error) {
 
-	userIn, err := b.storage.GetUserByID(strconv.Itoa(user.ID))
+	userIn, err := b.storage.GetUserByID(context.Background(), strconv.Itoa(user.ID))
 
 	if err != nil {
 		return false, errors.Wrap(err, "GetUserByID failed")
 	}
 
-	if userIn == nil {
-		return false, nil
-	}
-
-	return true, nil
+	return userIn != nil, nil
 }
 
 func (b *BotSvc) validLastCommand(lastCommand *apitypes.LastUserCommand) (bool, error) {
@@ -72,7 +69,7 @@ func (b *BotSvc) validLastCommand(lastCommand *apitypes.LastUserCommand) (bool, 
 }
 
 func (b *BotSvc) verificationWorkBot(message *tgbotapi.Message, bot *tgbotapi.BotAPI, msg tgbotapi.MessageConfig) error {
-	checkingBotWork, err := b.storage.CheckingPigeonWork(message.From.UserName)
+	checkingBotWork, err := b.storage.CheckingPigeonWork(context.Background(), message.From.UserName)
 
 	if err != nil {
 		return errors.Wrap(err, "CheckingPigeonWork failed")

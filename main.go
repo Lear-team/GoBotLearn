@@ -19,14 +19,13 @@ import (
 )
 
 var (
-	BotToken        = flag.String("BotToken", "---", "bot")
+	BotToken        = flag.String("BotToken", "1185900775:AAHBYsEDVRoE_CndYR1CjvTZM_ieFtVdvl4", "bot")
 	BindAddr        = flag.String("BindAddr", "8080", "localhost")
 	LogLevel        = flag.String("LogLevel", "release", "release")
 	ConnectPostgres = flag.String("ConnectPostgres", "user=postgres password=postgres dbname=PIgeonDB sslmode=disable", "connect db")
 )
 
 func main() {
-	flag.Parse()
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	viper.BindPFlags(pflag.CommandLine)
