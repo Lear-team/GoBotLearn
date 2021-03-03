@@ -69,7 +69,7 @@ func (b *BotSvc) validLastCommand(lastCommand *apitypes.LastUserCommand) (bool, 
 }
 
 func (b *BotSvc) verificationWorkBot(message *tgbotapi.Message, bot *tgbotapi.BotAPI, msg tgbotapi.MessageConfig) error {
-	checkingBotWork, err := b.storage.CheckingPigeonWork(context.Background(), message.From.UserName)
+	checkingBotWork, err := b.storage.CheckingPigeonWork(context.Background(), strconv.Itoa(message.From.ID))
 
 	if err != nil {
 		return errors.Wrap(err, "CheckingPigeonWork failed")

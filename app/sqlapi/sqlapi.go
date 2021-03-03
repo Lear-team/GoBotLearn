@@ -22,6 +22,7 @@ func NewAPI(db *sqlx.DB) *API {
 	}
 }
 
+// уйти от получения пользоваетля по имени, перейти на id
 // GetUserByName ...
 func (api *API) GetUserByName(ctx context.Context, nameUser string) (*apitypes.UserRow, error) {
 	return getUserByName(ctx, api.db, nameUser)
@@ -148,10 +149,6 @@ func getRefUserCodeByUserName(ctx context.Context, db TxContext, userN string) (
 
 // AddNewUser ...
 func (api *API) AddNewUser(ctx context.Context, userN, userID, chatID string) (*apitypes.UserRow, error) {
-	// tx := api.db.MustBegin()
-	// tx.MustExec(`INSERT INTO prj_user ("userid", "nameuser", "chatid") VALUES ($1, $2, $3)`,
-	// 	userID, userN, chatID)
-	// tx.Commit()
 	work := func(ctx context.Context, db TxContext) error {
 		err := addNewUser(ctx, db, userN, userID, chatID)
 		if err != nil {
@@ -165,12 +162,12 @@ func (api *API) AddNewUser(ctx context.Context, userN, userID, chatID string) (*
 		return nil, err
 	}
 
-	user, err := api.GetUserByID(ctx, userID)
-	if err != nil {
-		return nil, errors.Wrap(err, "AddNewUser GetUserByID failed with an error")
-	}
+	var user *apitypes.UserRow
+	user.ChatID = chatID
+	user.UserID = userID
+	user.NameUser = userN
 
-	return user, err
+	return user, nil
 }
 
 func addNewUser(ctx context.Context, db TxContext, userN, userID, chatID string) error {
@@ -204,20 +201,16 @@ func (api *API) AddNewCode(ctx context.Context, codeN string) (*apitypes.CodeRow
 }
 
 func addNewCode(ctx context.Context, db TxContext, codeN string) (*apitypes.CodeRow, error) {
-	var err error
-	var uid string
-
 	uuidWithHyphen := uuid.New()
-	uid = strings.Replace(uuidWithHyphen.String(), "-", "", -1)
+	uid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
 
 	if _, err := db.ExecContext(ctx, `INSERT INTO prj_code ("codeid", "code") VALUES ($1, $2)`, uid, codeN); err != nil {
 		return nil, err
 	}
 
-	code, err := getCodeByID(ctx, db, uid)
-	if err != nil {
-		return nil, errors.Wrap(err, "AddNewCode GetCodeByID failed with an error")
-	}
+	var code *apitypes.CodeRow
+	code.Code = codeN
+	code.CodeID = uid
 
 	return code, nil
 }
@@ -229,9 +222,8 @@ func (api *API) AddRefUserCode(ctx context.Context, codeR string, userIDR string
 
 	work := func(ctx context.Context, db TxContext) error {
 		refUserCode := []apitypes.RefUserCode{} // перенес в функцию, но мне не нравится это решение, надо уточнить как правильно делать
-		query := `SELECT ref_usercode.keyid, ref_usercode.codeid, ref_usercode.userid FROM ref_usercode 
-					JOIN prj_user ON ref_usercode.userid = prj_user.userid
-					WHERE prj_user.userid = $1 LIMIT 1;`
+		query := `SELECT ref_usercode.keyid, ref_usercode.codeid, ref_usercode.userid 
+					FROM ref_usercode WHERE ref_usercode.userid = $1 LIMIT 1;`
 
 		err := db.SelectContext(ctx, &refUserCode, query, userIDR)
 		if err != nil {
@@ -277,20 +269,13 @@ func (api *API) AddRefUserCode(ctx context.Context, codeR string, userIDR string
 }
 
 // UpdateRefUserCode ...
-func (api *API) UpdateRefUserCode(ctx context.Context, codeR string, userR string) (*apitypes.RefUserCode, error) { // проверить метод, может не корректно работать !!!
-
-	var refUserCode *apitypes.RefUserCode
-	var keyID string
+func (api *API) UpdateRefUserCode(ctx context.Context, codeR string, userID string) (*apitypes.RefUserCode, error) { // проверить метод, может не корректно работать !!!
 
 	work := func(ctx context.Context, db TxContext) error {
-		user, err := api.GetUserByName(ctx, userR)
-		if err != nil {
-			return errors.Wrapf(err, "Get user by name failed: %s", userR)
-		}
 
-		refUserCode, err := api.GetRefUserCodeByUserName(ctx, user.NameUser)
+		refUserCode, err := api.GetRefUserCodeByUserID(ctx, userID)
 		if err != nil {
-			return errors.Wrapf(err, "Get ref user code by user name failed: %s", user.NameUser)
+			return errors.Wrapf(err, "SELECT ref_usercode failed: %s", userID)
 		}
 
 		code, err := api.GetCodeByCode(ctx, codeR)
@@ -300,25 +285,25 @@ func (api *API) UpdateRefUserCode(ctx context.Context, codeR string, userR strin
 
 		if code == nil {
 			code, err = api.AddNewCode(ctx, codeR)
-		}
-
-		if err != nil {
-			return errors.Wrapf(err, "Add new code failed: %s", codeR)
-		}
-
-		if refUserCode == nil {
-			refUserCode, err = api.AddRefUserCode(ctx, codeR, userR)
-
 			if err != nil {
-				return errors.Wrapf(err, "Add ref user code failed: %s", userR)
+				return errors.Wrapf(err, "Add new code failed: %s", codeR)
 			}
 		}
-		keyID = refUserCode.KeyID
+
+		if refUserCode == nil { // можно убрать, не должно прилетать сюда без установленного ключа
+			_, err := api.AddRefUserCode(ctx, codeR, userID)
+
+			if err != nil {
+				return errors.Wrapf(err, "Add ref user code failed: %s", userID)
+			}
+			return nil
+		}
 
 		if _, err := db.ExecContext(ctx, `UPDATE ref_usercode SET codeid = $1 WHERE keyid = $2`, code.CodeID, refUserCode.KeyID); err != nil {
 			return errors.Wrap(err, "UPDATE ref_usercode failed: %s")
 		}
 
+		// keyID = refUserCode[0].KeyID
 		return nil
 	}
 
@@ -326,10 +311,31 @@ func (api *API) UpdateRefUserCode(ctx context.Context, codeR string, userR strin
 		return nil, err
 	}
 
-	refUserCode, err := api.GetRefUserCodeByKeyID(ctx, keyID)
+	refCode, err := api.GetRefUserCodeByUserID(ctx, userID)
 	if err != nil {
 		return nil, errors.Wrap(err, "Get ref user code by key ID")
 	}
 
-	return refUserCode, err
+	return refCode, err
+}
+
+// GetRefUserCodeByKeyID ...
+func (api *API) GetRefUserCodeByUserID(ctx context.Context, userID string) (*apitypes.RefUserCode, error) {
+	return getRefUserCodeByUserID(ctx, api.db, userID)
+}
+
+func getRefUserCodeByUserID(ctx context.Context, db TxContext, userID string) (*apitypes.RefUserCode, error) {
+	rowUserCode := []apitypes.RefUserCode{}
+	queryRefCode := `SELECT ref_usercode.keyid, ref_usercode.codeid, ref_usercode.userid 
+	FROM ref_usercode WHERE ref_usercode.userid = $1 LIMIT 1;`
+
+	err := db.SelectContext(ctx, &rowUserCode, queryRefCode, userID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "can't get ref_usercode by userid %s", userID)
+	}
+
+	if len(rowUserCode) == 0 {
+		return nil, nil
+	}
+	return &rowUserCode[0], nil
 }

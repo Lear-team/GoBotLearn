@@ -12,15 +12,10 @@ import (
 )
 
 // CheckingPigeonWork ...
-func (api *API) CheckingPigeonWork(ctx context.Context, userN string) (bool, error) {
-
-	user, err := api.GetUserByName(ctx, userN)
-	if err != nil {
-		return false, errors.Wrap(err, "Get user by name failed")
-	}
+func (api *API) CheckingPigeonWork(ctx context.Context, userID string) (bool, error) {
 
 	var botWork = []apitypes.BotWork{}
-	err = api.db.SelectContext(ctx, &botWork, "SELECT * FROM prj_botwork WHERE userid = $1 LIMIT 1;", user.UserID)
+	err := api.db.SelectContext(ctx, &botWork, "SELECT * FROM prj_botwork WHERE userid = $1 LIMIT 1;", userID)
 	if err != nil {
 		return false, errors.Wrap(err, "SELECT * FROM prj_botwork failed")
 	}
@@ -32,58 +27,29 @@ func (api *API) CheckingPigeonWork(ctx context.Context, userN string) (bool, err
 }
 
 // StartPigeonWork ...
-func (api *API) StartPigeonWork(ctx context.Context, userN string) error {
+func (api *API) StartPigeonWork(ctx context.Context, userID string) error { // проверить как работает
 
-	user, err := getUserByName(ctx, api.db, userN)
+	err := api.CreatePigeonWorkFlag(ctx, userID)
 	if err != nil {
-		return errors.Wrap(err, "Get user by name failed")
-	}
-
-	work := func(ctx context.Context, db TxContext) error {
-		var botWork = []apitypes.BotWork{}
-		err = db.SelectContext(ctx, &botWork, "SELECT botworkid, userid, botworkflag FROM prj_botwork WHERE userid = $1 LIMIT 1;", user.UserID)
-		if err != nil {
-			return errors.Wrap(err, "SELECT * FROM prj_botwork failed")
-		}
-
-		if len(botWork) == 0 {
-			err = api.CreatePigeonWorkFlag(ctx, userN)
-			if err != nil {
-				return errors.Wrap(err, "Create pigeon work flag failed")
-			}
-		} else {
-			if _, err := db.ExecContext(ctx, `UPDATE prj_botwork SET botworkflag = $1  WHERE botworkid = $2`, true, botWork[0].BotWorkID); err != nil {
-				return errors.Wrap(err, "UPDATE prj_botwork SET failed")
-			}
-		}
-
-		return nil
-	}
-
-	if err := RunInTransaction(ctx, api.db, work); err != nil {
-		return errors.Wrap(err, "RunInTransaction failed")
+		return errors.Wrap(err, "Create pigeon work flag failed")
 	}
 
 	return nil
 }
 
 // StopPigeonWork ...
-func (api *API) StopPigeonWork(ctx context.Context, userN string) error {
-	user, err := api.GetUserByName(ctx, userN)
-	if err != nil {
-		return errors.Wrap(err, "Get user by name failed")
-	}
-
+func (api *API) StopPigeonWork(ctx context.Context, userID string) error {
 	work := func(ctx context.Context, db TxContext) error {
+		query := `INSERT INTO prj_botwork ("botworkid", "userid", "botworkflag") VALUES ($1, $2, $3)
+					ON CONFLICT (userid)
+					DO 
+					UPDATE SET botworkflag = $3`
 
-		var botWork = []apitypes.BotWork{}
-		err = db.SelectContext(ctx, &botWork, "SELECT botworkid, userid, botworkflag FROM prj_botwork WHERE userid = $1 LIMIT 1", user.UserID)
-		if err != nil {
-			return errors.Wrap(err, "SELECT * FROM prj_botwork failed")
-		}
+		uuidWithHyphen := uuid.New()
+		uid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
 
-		if _, err := db.ExecContext(ctx, `UPDATE prj_botwork SET botworkflag = $1 WHERE botworkid = $2`, false, botWork[0].BotWorkID); err != nil {
-			return errors.Wrap(err, "UPDATE prj_botwork failed")
+		if _, err := db.ExecContext(ctx, query, uid, userID, false); err != nil {
+			return err
 		}
 		return nil
 	}
@@ -96,29 +62,19 @@ func (api *API) StopPigeonWork(ctx context.Context, userN string) error {
 }
 
 // CreatePigeonWorkFlag ...
-func (api *API) CreatePigeonWorkFlag(ctx context.Context, userN string) error {
-	user, err := api.GetUserByName(ctx, userN)
-	if err != nil {
-		return errors.Wrap(err, "Get user by name failed")
-	}
-
+func (api *API) CreatePigeonWorkFlag(ctx context.Context, userID string) error {
 	work := func(ctx context.Context, db TxContext) error {
-		var botWork = []apitypes.BotWork{}
-		err = db.SelectContext(ctx, &botWork, "SELECT botworkid, userid, botworkflag FROM prj_botwork WHERE userid = $1", user.UserID)
+		query := `INSERT INTO prj_botwork ("botworkid", "userid", "botworkflag") VALUES ($1, $2, $3)
+					ON CONFLICT (userid)
+					DO 
+					UPDATE SET botworkflag = $3`
 
-		if err != nil {
-			return errors.Wrap(err, "SELECT * FROM prj_botwork failed")
+		uuidWithHyphen := uuid.New()
+		uid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
+
+		if _, err := db.ExecContext(ctx, query, uid, userID, true); err != nil {
+			return err
 		}
-
-		if len(botWork) == 0 {
-			uuidWithHyphen := uuid.New()
-			uid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
-
-			if _, err := db.ExecContext(ctx, `INSERT INTO prj_botwork ("botworkid", "userid", "botworkflag") VALUES ($1, $2, $3)`, uid, user.UserID, true); err != nil {
-				return err
-			}
-		}
-
 		return nil
 	}
 
@@ -189,7 +145,6 @@ func (api *API) DeleteLastCommand(ctx context.Context, userId string, command st
 		if _, err := db.ExecContext(ctx, `DELETE FROM prj_lastusercommand WHERE userid = $1`, userId); err != nil {
 			return errors.Wrap(err, "DELETE FROM prj_lastusercommand")
 		}
-
 		return nil
 	}
 

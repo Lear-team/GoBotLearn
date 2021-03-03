@@ -86,7 +86,7 @@ COMMENT ON TABLE prj_letter.dataletter IS 'Дата создания сообщ�
 
 CREATE TABLE prj_botwork(
     botworkid CHARACTER VARYING(32) NOT NULL,
-    userid CHARACTER VARYING(32) NOT NULL,
+    userid CHARACTER VARYING(32) NOT NULL UNIQUE,
     botworkflag boolean NOT NULL,
 
     CONSTRAINT pk_prj_botworkid PRIMARY KEY (botworkid),
