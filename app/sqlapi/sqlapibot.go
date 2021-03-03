@@ -15,7 +15,10 @@ import (
 func (api *API) CheckingPigeonWork(ctx context.Context, userID string) (bool, error) {
 
 	var botWork = []apitypes.BotWork{}
-	err := api.db.SelectContext(ctx, &botWork, "SELECT * FROM prj_botwork WHERE userid = $1 LIMIT 1;", userID)
+
+	query := "SELECT * FROM prj_botwork WHERE userid = $1 LIMIT 1;"
+
+	err := api.db.SelectContext(ctx, &botWork, query, userID)
 	if err != nil {
 		return false, errors.Wrap(err, "SELECT * FROM prj_botwork failed")
 	}
@@ -40,6 +43,7 @@ func (api *API) StartPigeonWork(ctx context.Context, userID string) error { // Ð
 // StopPigeonWork ...
 func (api *API) StopPigeonWork(ctx context.Context, userID string) error {
 	work := func(ctx context.Context, db TxContext) error {
+
 		query := `INSERT INTO prj_botwork ("botworkid", "userid", "botworkflag") VALUES ($1, $2, $3)
 					ON CONFLICT (userid)
 					DO 
@@ -64,6 +68,7 @@ func (api *API) StopPigeonWork(ctx context.Context, userID string) error {
 // CreatePigeonWorkFlag ...
 func (api *API) CreatePigeonWorkFlag(ctx context.Context, userID string) error {
 	work := func(ctx context.Context, db TxContext) error {
+
 		query := `INSERT INTO prj_botwork ("botworkid", "userid", "botworkflag") VALUES ($1, $2, $3)
 					ON CONFLICT (userid)
 					DO 
@@ -93,11 +98,15 @@ func (api *API) SetLastComandUser(ctx context.Context, userN string, command str
 	}
 
 	work := func(ctx context.Context, db TxContext) error {
+
+		query := `INSERT INTO prj_lastusercommand ("commandid", "userid", "command", "datacommand") 
+					VALUES ($1, $2, $3, $4)`
+
 		uuidWithHyphen := uuid.New()
 		uid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
 		today := time.Now()
 		tTime := today.Add(10 * time.Minute).Format("2006/1/2 15:04")
-		if _, err := db.ExecContext(ctx, `INSERT INTO prj_lastusercommand ("commandid", "userid", "command", "datacommand") VALUES ($1, $2, $3, $4)`, uid, user.UserID, command, tTime); err != nil {
+		if _, err := db.ExecContext(ctx, query, uid, user.UserID, command, tTime); err != nil {
 			return err
 		}
 		return nil
@@ -126,7 +135,10 @@ func getLastCommandByUserName(ctx context.Context, db TxContext, userN string) (
 
 	var arrCommand = []apitypes.LastUserCommand{}
 
-	err = db.SelectContext(ctx, &arrCommand, "SELECT commandid, userid, command, datacommand FROM prj_lastusercommand WHERE (userid = $1) ORDER BY datacommand DESC", user.UserID)
+	query := `SELECT commandid, userid, command, datacommand FROM prj_lastusercommand 
+				WHERE (userid = $1) ORDER BY datacommand DESC`
+
+	err = db.SelectContext(ctx, &arrCommand, query, user.UserID)
 	if err != nil {
 		return nil, errors.Wrap(err, "SELECT * FROM prj_lastusercommand failed")
 	}
@@ -142,7 +154,10 @@ func getLastCommandByUserName(ctx context.Context, db TxContext, userN string) (
 func (api *API) DeleteLastCommand(ctx context.Context, userId string, command string) error {
 
 	work := func(ctx context.Context, db TxContext) error {
-		if _, err := db.ExecContext(ctx, `DELETE FROM prj_lastusercommand WHERE userid = $1`, userId); err != nil {
+
+		query := `DELETE FROM prj_lastusercommand WHERE userid = $1`
+
+		if _, err := db.ExecContext(ctx, query, userId); err != nil {
 			return errors.Wrap(err, "DELETE FROM prj_lastusercommand")
 		}
 		return nil
