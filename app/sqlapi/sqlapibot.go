@@ -2,6 +2,7 @@ package sqlapi
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"time"
 
@@ -14,19 +15,21 @@ import (
 // CheckingPigeonWork ...
 func (api *API) CheckingPigeonWork(ctx context.Context, userID string) (bool, error) {
 
-	var botWork = []apitypes.BotWork{}
+	var botWork = apitypes.BotWork{}
 
 	query := "SELECT * FROM prj_botwork WHERE userid = $1 LIMIT 1;"
 
-	err := api.db.SelectContext(ctx, &botWork, query, userID)
+	err := api.db.GetContext(ctx, &botWork, query, userID)
 	if err != nil {
-		return false, errors.Wrap(err, "SELECT * FROM prj_botwork failed")
+		if !errors.Is(err, sql.ErrNoRows) {
+			return false, errors.Wrap(err, "SELECT * FROM prj_botwork failed")
+		}
 	}
-	if len(botWork) == 0 {
+	if botWork.UserID == "" {
 		return false, err
 	}
 
-	return botWork[0].BotWorkFlag, err
+	return botWork.BotWorkFlag, err
 }
 
 // StartPigeonWork ...
@@ -133,38 +136,32 @@ func getLastCommandByUserName(ctx context.Context, db TxContext, userN string) (
 		return nil, nil // создать ошибку
 	}
 
-	var arrCommand = []apitypes.LastUserCommand{}
+	var arrCommand = apitypes.LastUserCommand{}
 
 	query := `SELECT commandid, userid, command, datacommand FROM prj_lastusercommand 
 				WHERE (userid = $1) ORDER BY datacommand DESC`
 
-	err = db.SelectContext(ctx, &arrCommand, query, user.UserID)
+	err = db.GetContext(ctx, &arrCommand, query, user.UserID)
 	if err != nil {
-		return nil, errors.Wrap(err, "SELECT * FROM prj_lastusercommand failed")
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Wrap(err, "SELECT * FROM prj_lastusercommand failed")
+		}
 	}
 
-	if len(arrCommand) == 0 {
-		return nil, nil // создать ошибку
+	if arrCommand.UserID == "" {
+		return nil, nil
 	}
 
-	return &arrCommand[0], nil
+	return &arrCommand, nil
 }
 
 // DeleteLastCommand ...
 func (api *API) DeleteLastCommand(ctx context.Context, userId string, command string) error {
 
-	work := func(ctx context.Context, db TxContext) error {
+	query := `DELETE FROM prj_lastusercommand WHERE userid = $1`
 
-		query := `DELETE FROM prj_lastusercommand WHERE userid = $1`
-
-		if _, err := db.ExecContext(ctx, query, userId); err != nil {
-			return errors.Wrap(err, "DELETE FROM prj_lastusercommand")
-		}
-		return nil
-	}
-
-	if err := RunInTransaction(ctx, api.db, work); err != nil {
-		return err
+	if _, err := api.db.ExecContext(ctx, query, userId); err != nil {
+		return errors.Wrap(err, "DELETE FROM prj_lastusercommand")
 	}
 	return nil
 }
