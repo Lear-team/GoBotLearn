@@ -13,24 +13,29 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // here
+	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 var (
-	BotToken        = flag.String("BotToken", "telegram_token", "Path to file keys.json")
-	BindAddr        = flag.String("BindAddr", "localhost", "Path to file keys.json")
-	LogLevel        = flag.String("LogLevel", "debug", "Path to file keys.json")
-	ConnectPostgres = flag.String("ConnectPostgres", "localhost", "Path to file keys.json")
+	BotToken        = pflag.String("BotToken", "1185900775:AAHBYsEDVRoE_CndYR1CjvTZM_ieFtVdvl4", "bot")
+	BindAddr        = pflag.String("BindAddr", "8080", "localhost")
+	LogLevel        = pflag.String("LogLevel", "release", "release")
+	ConnectPostgres = pflag.String("ConnectPostgres", "user=postgres password=postgres dbname=PIgeonDB sslmode=disable", "connect db")
 )
 
 func main() {
-	flag.Parse()
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+	viper.BindPFlags(pflag.CommandLine)
 
 	commandsBot, err := getCommands()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	db, err := connectDB(*ConnectPostgres)
+	db, err := connectDB()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,7 +44,7 @@ func main() {
 	apiStorage := sqlapi.NewAPI(db)
 	svc := service.NewBotSvc(apiStorage, commandsBot)
 
-	bot, err := tgbotapi.NewBotAPI(*BotToken)
+	bot, err := tgbotapi.NewBotAPI(viper.GetString("BotToken"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -65,16 +70,16 @@ func main() {
 }
 
 // connectDB ...
-func connectDB(databaseURL string) (*sqlx.DB, error) {
-	db, err := sqlx.Open("postgres", databaseURL)
+func connectDB() (*sqlx.DB, error) {
+	bc := viper.GetString("ConnectPostgres")
+
+	db, err := sqlx.Open("postgres", bc)
 	if err != nil {
-		log.Println("sqlx.Open failed with an error: ", err.Error())
-		return nil, err
+		return nil, errors.Wrap(err, "sqlx.Open failed with an error")
 	}
 
 	if err := db.Ping(); err != nil {
-		log.Println("DB.Ping failed with an error: ", err.Error())
-		return nil, err
+		return nil, errors.Wrap(err, "DB.Ping failed with an error")
 	}
 
 	return db, err
@@ -83,15 +88,13 @@ func connectDB(databaseURL string) (*sqlx.DB, error) {
 func getCommands() (types.Commands, error) {
 	data, err := ioutil.ReadFile("./config/command.json")
 	if err != nil {
-		log.Println("Reading the command file ended with an error: ", err.Error())
-		return types.Commands{}, err
+		return types.Commands{}, errors.Wrap(err, "Reading the command file ended with an error")
 	}
 
 	cmd := types.Commands{}
 	err = json.Unmarshal(data, &cmd)
 	if err != nil {
-		log.Println("Unmarshal ended with an error: ", err.Error())
-		return types.Commands{}, err
+		return types.Commands{}, errors.Wrap(err, "Unmarshal ended with an error")
 	}
 
 	return cmd, nil

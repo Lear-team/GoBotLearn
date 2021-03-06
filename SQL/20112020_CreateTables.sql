@@ -30,9 +30,9 @@ COMMENT ON TABLE prj_code.codeid IS 'Идентификатор кодового
 COMMENT ON TABLE prj_code.code IS 'Кодовое слово';
 
 CREATE TABLE ref_usercode(
-    keyid CHARACTER VARYING(32) NOT NULL, -- идентификатор 
+    keyid CHARACTER VARYING(32) NOT NULL UNIQUE, -- идентификатор 
     codeid CHARACTER VARYING(32) , -- идентификатор кодового слова
-    userid CHARACTER VARYING(32) NOT NULL, -- идентификатор пользователя
+    userid CHARACTER VARYING(32) NOT NULL UNIQUE, -- идентификатор пользователя
 
     CONSTRAINT pk_ref_usercode PRIMARY KEY (keyid),
     CONSTRAINT pk_prj_user FOREIGN KEY (userid)
@@ -86,7 +86,7 @@ COMMENT ON TABLE prj_letter.dataletter IS 'Дата создания сообщ�
 
 CREATE TABLE prj_botwork(
     botworkid CHARACTER VARYING(32) NOT NULL,
-    userid CHARACTER VARYING(32) NOT NULL,
+    userid CHARACTER VARYING(32) NOT NULL UNIQUE,
     botworkflag boolean NOT NULL,
 
     CONSTRAINT pk_prj_botworkid PRIMARY KEY (botworkid),

@@ -1,627 +1,359 @@
 package sqlapi
 
 import (
+	"context"
+	"database/sql"
 	"log"
 	"strings"
-	"time"
 
 	apitypes "GoBotPigeon/types/apitypes"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq" // here
 	"github.com/pkg/errors"
 )
 
-// DB ...
-var DB *sqlx.DB
-
-// ConnectDb ...
-func ConnectDb(databaseURL string) (err error) {
-
-	DB, err = sqlx.Open("postgres", databaseURL)
-	if err != nil {
-		log.Println("sqlx.Open failed with an error: ", err.Error())
-		return err
-	}
-
-	if err := DB.Ping(); err != nil {
-		log.Println("DB.Ping failed with an error: ", err.Error())
-		return err
-	}
-
-	return
+type API struct {
+	db *sqlx.DB
 }
 
-// CloseConnectDb ...
-func CloseConnectDb(db *sqlx.DB) {
-	db.Close()
+func NewAPI(db *sqlx.DB) *API {
+	return &API{
+		db: db,
+	}
+}
+
+// уйти от получения пользоваетля по имени, перейти на id
+// GetUserByName ...
+func (api *API) GetUserByName(ctx context.Context, nameUser string) (*apitypes.UserRow, error) {
+	return getUserByName(ctx, api.db, nameUser)
+}
+
+func getUserByName(ctx context.Context, db TxContext, nameUser string) (*apitypes.UserRow, error) {
+	userRow := apitypes.UserRow{}
+
+	query := "SELECT userid, nameuser, chatid FROM prj_user WHERE nameuser = $1 LIMIT 1;"
+
+	err := db.GetContext(ctx, &userRow, query, nameUser)
+
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Wrapf(err, "can't get user by name %s", nameUser)
+		}
+	}
+	if userRow.UserID == "" {
+		return nil, err
+	}
+	return &userRow, nil
 }
 
 // GetUserByID ...
-func GetUserByID(idUser string, db *sqlx.DB) (*apitypes.UserRow, error) {
-	userRow := []apitypes.UserRow{}
-
-	if err := db.Ping(); err != nil {
-		log.Println("DB.Ping failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	err := db.Select(&userRow, "SELECT * FROM prj_user WHERE (userid = $1)", idUser)
-
-	if err != nil {
-		log.Println("GetUserByID db.Select failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	if len(userRow) == 1 {
-		return &userRow[0], err
-	}
-
-	return nil, err
+func (api *API) GetUserByID(ctx context.Context, idUser string) (*apitypes.UserRow, error) {
+	return getUserByID(ctx, api.db, idUser)
 }
 
-// GetUserByName ...
-func GetUserByName(nameUser string, db *sqlx.DB) (*apitypes.UserRow, error) {
+func getUserByID(ctx context.Context, db TxContext, userID string) (*apitypes.UserRow, error) {
+	userRow := apitypes.UserRow{}
 
-	userRow := []apitypes.UserRow{}
-	if err := db.Ping(); err != nil {
-		log.Println("GetUserByName db.Ping failed with an error: ", err.Error())
-		return nil, err
-	}
+	query := "SELECT userid, nameuser, chatid FROM prj_user WHERE userid = $1 LIMIT 1;"
 
-	err := db.Select(&userRow, "SELECT * FROM prj_user WHERE (nameuser = $1)", nameUser)
-
+	err := db.GetContext(ctx, &userRow, query, userID)
 	if err != nil {
-		log.Println("GetUserByName db.Select failed with an error: ", err.Error())
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Wrap(err, "getUserById failed")
+		}
+	}
+
+	if userRow.UserID == "" {
 		return nil, err
 	}
 
-	if len(userRow) == 1 {
-		return &userRow[0], err
-	}
-
-	return nil, err
+	return &userRow, err
 }
 
 // GetCodeByID ...
-func GetCodeByID(idCode string, db *sqlx.DB) (*apitypes.CodeRow, error) {
+func (api *API) GetCodeByID(ctx context.Context, idCode string) (*apitypes.CodeRow, error) {
+	return getCodeByID(ctx, api.db, idCode)
+}
 
-	codeRow := []apitypes.CodeRow{}
-	if err := db.Ping(); err != nil {
-		log.Println("GetCodeByID db.Ping failed with an error: ", err.Error())
-		return nil, err
+func getCodeByID(ctx context.Context, db TxContext, idCode string) (*apitypes.CodeRow, error) {
+
+	const query = `SELECT codeid, code
+		FROM prj_code 
+		WHERE codeid = $1 
+		LIMIT 1;
+	`
+	codeRow := apitypes.CodeRow{}
+	if err := db.GetContext(ctx, &codeRow, query, idCode); err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Wrapf(err, "can't get code by id %s", idCode)
+		}
 	}
 
-	err := db.Select(&codeRow, "SELECT * FROM prj_code WHERE (codeid = $1)", idCode)
-
-	if err != nil {
-		log.Println("GetCodeByID db.Select failed with an error: ", err.Error())
-		return nil, err
+	if codeRow.CodeID == "" {
+		return nil, nil
 	}
 
-	if len(codeRow) == 1 {
-		return &codeRow[0], err
-	}
-
-	return nil, err
+	return &codeRow, nil
 }
 
 // GetCodeByCode ...
-func GetCodeByCode(codeCode string, db *sqlx.DB) (*apitypes.CodeRow, error) {
-
-	codeRow := []apitypes.CodeRow{}
-	if err := db.Ping(); err != nil {
-		log.Println("GetCodeByCode db.Ping failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	err := db.Select(&codeRow, "SELECT * FROM prj_code WHERE (code = $1)", codeCode)
-
-	if err != nil {
-		log.Println("GetCodeByCode db.Select failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	if len(codeRow) == 1 {
-		return &codeRow[0], err
-	}
-
-	return nil, err
+func (api *API) GetCodeByCode(ctx context.Context, codeCode string) (*apitypes.CodeRow, error) {
+	return getCodeByCode(ctx, api.db, codeCode)
 }
 
-// AddNewUser ...
-func AddNewUser(userN string, userID string, chatID string, db *sqlx.DB) (*apitypes.UserRow, error) {
+func getCodeByCode(ctx context.Context, db TxContext, codeCode string) (*apitypes.CodeRow, error) {
+	codeRow := apitypes.CodeRow{}
 
-	if err := db.Ping(); err != nil {
-		log.Println("AddNewUser db.Ping failed with an error: ", err.Error())
-		return nil, err
-	}
+	query := "SELECT codeid, code FROM prj_code WHERE code = $1"
 
-	user, err := GetUserByID(userID, db)
-
+	err := db.GetContext(ctx, &codeRow, query, codeCode)
 	if err != nil {
-		log.Println("AddNewUser GetUserByID failed with an error: ", err.Error())
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Wrap(err, "GetCodeByCode api.db.Select failed with an error")
+		}
+	}
+
+	if codeRow.CodeID == "" {
 		return nil, err
 	}
 
-	if user != nil {
-		return nil, err
-	}
-
-	tx := db.MustBegin()
-	tx.MustExec(`INSERT INTO prj_user ("userid", "nameuser", "chatid") VALUES ($1, $2, $3)`,
-		userID, userN, chatID)
-	tx.Commit()
-
-	user, err = GetUserByID(userID, db)
-	if err != nil {
-		log.Println("AddNewUser GetUserByID failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	return user, err
-}
-
-// AddNewCode ...
-func AddNewCode(codeN string, db *sqlx.DB) (*apitypes.CodeRow, error) {
-
-	if err := db.Ping(); err != nil {
-		log.Println("AddNewCode db.Ping failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	code, err := GetCodeByCode(codeN, db)
-	if err != nil {
-		log.Println("AddNewCode GetCodeByCode failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	if code != nil {
-		return nil, err
-	}
-
-	uuidWithHyphen := uuid.New()
-	uuid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
-
-	tx := db.MustBegin()
-	tx.MustExec(`INSERT INTO prj_code ("codeid", "code") VALUES ($1, $2)`,
-		uuid, codeN)
-	tx.Commit()
-
-	code, err = GetCodeByID(uuid, db)
-	if err != nil {
-		log.Println("AddNewCode GetCodeByID failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	return code, err
-}
-
-// AddRefUserCode ...
-func AddRefUserCode(codeR string, userIDR string, db *sqlx.DB) (*apitypes.RefUserCode, error) {
-	var refUserCode = &apitypes.RefUserCode{}
-
-	if err := db.Ping(); err != nil {
-		log.Println("AddRefUserCode db.Ping failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	user, err := GetUserByID(userIDR, db)
-
-	if err != nil {
-		// log.Fatal(err)
-		return nil, err
-	}
-
-	if user == nil {
-		log.Printf("Такой пользователя не зарегестрирован")
-		return nil, err
-	}
-
-	refUserCode, err = GetRefUserCodeByUserName(user.NameUser, db)
-	if err != nil {
-		log.Println("AddRefUserCode GetRefUserCodeByUserName failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	if refUserCode != nil {
-		log.Printf("Пользователь уже установил кодовое слово")
-		return nil, err
-	}
-
-	code, err := GetCodeByCode(codeR, db)
-	if err != nil {
-		log.Println("AddRefUserCode GetCodeByCode failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	if code == nil {
-		code, err = AddNewCode(codeR, db)
-	}
-
-	if err != nil {
-		log.Println("AddRefUserCode AddNewCode failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	if code == nil {
-		//log.Fatal(err)
-		return nil, err
-	}
-
-	uuidWithHyphen := uuid.New()
-	uuid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
-
-	tx := db.MustBegin()
-	tx.MustExec(`INSERT INTO ref_usercode ("keyid", "codeid", "userid") VALUES ($1, $2, $3)`,
-		uuid, code.CodeID, user.UserID)
-	tx.Commit()
-
-	refUserCode, err = GetRefUserCodeByKeyID(uuid, db)
-	if err != nil {
-		log.Println("AddRefUserCode GetRefUserCodeByKeyID failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	return refUserCode, err
+	return &codeRow, err
 }
 
 // GetRefUserCodeByKeyID ...
-func GetRefUserCodeByKeyID(keyID string, db *sqlx.DB) (*apitypes.RefUserCode, error) {
+func (api *API) GetRefUserCodeByKeyID(ctx context.Context, keyID string) (*apitypes.RefUserCode, error) {
+	return getRefUserCodeByKeyID(ctx, api.db, keyID)
+}
 
-	if err := db.Ping(); err != nil {
-		log.Println("GetRefUserCodeByKeyID db.Ping failed with an error: ", err.Error())
-		return nil, err
-	}
+func getRefUserCodeByKeyID(ctx context.Context, db TxContext, keyID string) (*apitypes.RefUserCode, error) {
+	rowUserCode := apitypes.RefUserCode{}
 
-	refUserCode := []apitypes.RefUserCode{}
-	err := db.Select(&refUserCode, "SELECT * FROM ref_usercode WHERE (keyid = $1)", keyID)
+	query := "SELECT keyid, codeid, userid FROM ref_usercode WHERE keyid = $1 LIMIT 1;"
 
+	err := db.GetContext(ctx, &rowUserCode, query, keyID)
 	if err != nil {
-		log.Println("GetRefUserCodeByKeyID db.Select failed with an error: ", err.Error())
-		return nil, err
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Wrapf(err, "can't get ref_usercode by keyid %s", keyID)
+		}
 	}
 
-	if len(refUserCode) == 1 {
-		return &refUserCode[0], err
+	if rowUserCode.UserID == "" {
+		return nil, nil
 	}
-
-	return nil, err
+	return &rowUserCode, nil
 }
 
 // GetRefUserCodeByUserName ...
-func GetRefUserCodeByUserName(userN string, db *sqlx.DB) (*apitypes.RefUserCode, error) {
-
-	if err := db.Ping(); err != nil {
-		log.Println("GetRefUserCodeByUserName db.Ping failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	user, err := GetUserByName(userN, db)
-
-	if err != nil {
-		log.Println("GetRefUserCodeByUserName GetUserByName failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	if user == nil {
-		log.Printf("Такой пользователя не зарегестрирован")
-		return nil, err
-	}
-
-	rowUserCode := []apitypes.RefUserCode{}
-	err = db.Select(&rowUserCode, "SELECT * FROM ref_usercode WHERE (userid = $1)", string(user.UserID))
-
-	if err != nil {
-		log.Println("GetRefUserCodeByUserName db.Select failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	if len(rowUserCode) == 1 {
-		return &rowUserCode[0], nil
-	}
-
-	return nil, err
+func (api *API) GetRefUserCodeByUserName(ctx context.Context, userN string) (*apitypes.RefUserCode, error) {
+	return getRefUserCodeByUserName(ctx, api.db, userN)
 }
 
-// UpdateRefUserCode ...
-func UpdateRefUserCode(codeR string, userR string, db *sqlx.DB) (*apitypes.RefUserCode, error) {
-	var refUserCode = &apitypes.RefUserCode{}
+func getRefUserCodeByUserName(ctx context.Context, db TxContext, userN string) (*apitypes.RefUserCode, error) {
 
-	if err := db.Ping(); err != nil {
-		log.Println("UpdateRefUserCode db.Ping failed with an error: ", err.Error())
-		return nil, err
-	}
+	query := `SELECT ref_usercode.keyid, ref_usercode.codeid, ref_usercode.userid FROM ref_usercode 
+			JOIN prj_user ON ref_usercode.userid = prj_user.userid
+			WHERE prj_user.nameuser = $1 LIMIT 1;`
 
-	user, err := GetUserByName(userR, db)
-
+	rowUserCode := apitypes.RefUserCode{}
+	err := db.GetContext(ctx, &rowUserCode, query, userN)
 	if err != nil {
-		log.Println("UpdateRefUserCode GetUserByName failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	if user == nil {
-		log.Printf("Такой пользователя не зарегестрирован")
-		return nil, err
-	}
-
-	refUserCode, err = GetRefUserCodeByUserName(user.NameUser, db)
-	if err != nil {
-		log.Println("UpdateRefUserCode GetRefUserCodeByUserName failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	code, err := GetCodeByCode(codeR, db)
-	if err != nil {
-		log.Println("UpdateRefUserCode GetCodeByCode failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	if code == nil {
-		code, err = AddNewCode(codeR, db)
-	}
-
-	if err != nil {
-		log.Println("UpdateRefUserCode AddNewCode failed with an error: ", err.Error())
-		return nil, err
-	}
-
-	if refUserCode == nil {
-		//log.Fatal("Пользователь еще не установил кодовое слово") // можно сразу вызывать добавление, но думаю лучше обработать ошибку
-		refUserCode, err = AddRefUserCode(codeR, userR, db)
-
-		if err != nil {
-			log.Println("UpdateRefUserCode AddRefUserCode failed with an error: ", err.Error())
-			return nil, err
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Wrapf(err, "can't get ref_usercode by nameuser %s", userN)
 		}
-		return refUserCode, err
 	}
 
-	tx := db.MustBegin()
-	tx.MustExec(`UPDATE ref_usercode SET codeid = $1 WHERE keyid = $2`, code.CodeID, refUserCode.KeyID)
-	tx.Commit()
+	if rowUserCode.UserID == "" {
+		return nil, nil
+	}
 
-	refUserCode, err = GetRefUserCodeByKeyID(refUserCode.KeyID, db)
+	return &rowUserCode, nil
+}
+
+// AddNewUser ...
+func (api *API) AddNewUser(ctx context.Context, userN, userID, chatID string) (*apitypes.UserRow, error) {
+
+	err := addNewUser(ctx, api.db, userN, userID, chatID)
 	if err != nil {
-		log.Println("UpdateRefUserCode GetRefUserCodeByKeyID failed with an error: ", err.Error())
 		return nil, err
+	}
+
+	var user *apitypes.UserRow
+	user.ChatID = chatID
+	user.UserID = userID
+	user.NameUser = userN
+
+	return user, nil
+}
+
+func addNewUser(ctx context.Context, db TxContext, userN, userID, chatID string) error {
+
+	query := `INSERT INTO prj_user ("userid", "nameuser", "chatid") VALUES ($1, $2, $3)`
+
+	if _, err := db.ExecContext(ctx, query,
+		userID, userN, chatID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AddNewCode ...
+func (api *API) AddNewCode(ctx context.Context, codeN string) (*apitypes.CodeRow, error) {
+	var code *apitypes.CodeRow
+
+	code, err := addNewCode(ctx, api.db, codeN)
+	if err != nil {
+		return nil, errors.Wrap(err, "addNewCode failed")
+	}
+	return code, nil
+}
+
+func addNewCode(ctx context.Context, db TxContext, codeN string) (*apitypes.CodeRow, error) {
+	uuidWithHyphen := uuid.New()
+	uid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
+
+	query := `INSERT INTO prj_code ("codeid", "code") VALUES ($1, $2)`
+
+	if _, err := db.ExecContext(ctx, query, uid, codeN); err != nil {
+		return nil, err
+	}
+
+	var code *apitypes.CodeRow
+	code.Code = codeN
+	code.CodeID = uid
+
+	return code, nil
+}
+
+// можно разбить метод на 2 метода и перед добавление проверять на существование связи кодово слово  - пользователь
+// AddRefUserCode ...
+func (api *API) AddRefUserCode(ctx context.Context, codeR string, userIDR string) (*apitypes.RefUserCode, error) {
+	var err error
+	var uid string
+
+	work := func(ctx context.Context, db TxContext) error {
+		refUserCode := apitypes.RefUserCode{} // перенес в функцию, но мне не нравится это решение, надо уточнить как правильно делать
+
+		query := `SELECT ref_usercode.keyid, ref_usercode.codeid, ref_usercode.userid 
+					FROM ref_usercode WHERE ref_usercode.userid = $1 LIMIT 1;`
+
+		err := db.GetContext(ctx, &refUserCode, query, userIDR)
+		if err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				return errors.Wrap(err, "getRefUserCodeByUserName failed")
+			}
+		}
+
+		if refUserCode.UserID != "" {
+			log.Printf("Пользователь уже установил кодовое слово")
+			return err
+		}
+
+		code, err := getCodeByCode(ctx, api.db, codeR)
+		if err != nil {
+			return errors.Wrap(err, "GetCodeByCode failed")
+		}
+
+		if code == nil {
+			code, err = addNewCode(ctx, db, codeR)
+		}
+
+		uuidWithHyphen := uuid.New()
+		uid = strings.Replace(uuidWithHyphen.String(), "-", "", -1)
+
+		insert := `INSERT INTO ref_usercode ("keyid", "codeid", "userid") VALUES ($1, $2, $3)`
+
+		if _, err := db.ExecContext(ctx, insert, uid, code.CodeID, userIDR); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := RunInTransaction(ctx, api.db, work); err != nil {
+		return nil, err
+	}
+
+	refUserCode, err := api.GetRefUserCodeByKeyID(ctx, uid)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetRefUserCodeByKeyID failed")
 	}
 
 	return refUserCode, err
 }
 
-// CheckingPigeonWork ...
-func CheckingPigeonWork(userN string, db *sqlx.DB) (bool, error) {
+// UpdateRefUserCode ...
+func (api *API) UpdateRefUserCode(ctx context.Context, codeR string, userID string) (*apitypes.RefUserCode, error) { // проверить метод, может не корректно работать !!!
 
-	if err := db.Ping(); err != nil {
-		log.Println("CheckingPigeonWork db.Ping failed with an error: ", err.Error())
-		return false, err
-	}
-
-	user, err := GetUserByName(userN, db)
-
-	if err != nil {
-		log.Println("CheckingPigeonWork GetUserByName failed with an error: ", err.Error())
-		return false, err
-	}
-
-	var botWork = []apitypes.BotWork{}
-	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
-
-	if err != nil {
-		log.Println("CheckingPigeonWork db.Select failed with an error: ", err.Error())
-		return false, err
-	}
-
-	if len(botWork) == 1 {
-		return botWork[0].BotWorkFlag, err
-	}
-
-	if len(botWork) > 1 {
-		log.Printf("Ошибка с флагом работы бота")
-		return false, err
-	}
-
-	return false, err
-}
-
-// StartPigeonWork ...
-func StartPigeonWork(userN string, db *sqlx.DB) error {
-	if err := db.Ping(); err != nil {
-		log.Println("StartPigeonWork db.Ping failed with an error: ", err.Error())
-		return err
-	}
-
-	user, err := GetUserByName(userN, db)
-
-	if err != nil {
-		log.Println("StartPigeonWork GetUserByName failed with an error: ", err.Error())
-		return err
-	}
-
-	var botWork = []apitypes.BotWork{}
-	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
-
-	if err != nil {
-		log.Println("StartPigeonWork db.Select failed with an error: ", err.Error())
-		return err
-	}
-
-	if len(botWork) == 1 {
-		tx := db.MustBegin()
-		tx.MustExec("UPDATE prj_botwork SET botworkflag = $1  WHERE botworkid = $2 ", true, botWork[0].BotWorkID)
-		tx.Commit()
-	}
-
-	if len(botWork) == 0 {
-		err = CreatePigeonWorkFlag(userN, db)
+	work := func(ctx context.Context, db TxContext) error {
+		refUserCode, err := api.GetRefUserCodeByUserID(ctx, userID)
 		if err != nil {
-			log.Println("StartPigeonWork CreatePigeonWorkFlag failed with an error: ", err.Error())
-			return err
+			return errors.Wrapf(err, "SELECT ref_usercode failed: %s", userID)
 		}
-		err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE (userid = $1)", user.UserID)
+
+		code, err := api.GetCodeByCode(ctx, codeR)
 		if err != nil {
-			log.Println("StartPigeonWork db.Select failed with an error: ", err.Error())
-			return err
+			return errors.Wrapf(err, "Get code by code failed: %s", codeR)
 		}
+
+		if code == nil {
+			code, err = api.AddNewCode(ctx, codeR)
+			if err != nil {
+				return errors.Wrapf(err, "Add new code failed: %s", codeR)
+			}
+		}
+
+		if refUserCode == nil { // можно убрать, не должно прилетать сюда без установленного ключа
+			_, err := api.AddRefUserCode(ctx, codeR, userID)
+
+			if err != nil {
+				return errors.Wrapf(err, "Add ref user code failed: %s", userID)
+			}
+			return nil
+		}
+
+		query := `UPDATE ref_usercode SET codeid = $1 WHERE keyid = $2`
+		if _, err := db.ExecContext(ctx, query, code.CodeID, refUserCode.KeyID); err != nil {
+			return errors.Wrap(err, "UPDATE ref_usercode failed: %s")
+		}
+
+		// keyID = refUserCode[0].KeyID
+		return nil
 	}
 
-	return err
-}
-
-// StopPigeonWork ...
-func StopPigeonWork(userN string, db *sqlx.DB) error {
-	if err := db.Ping(); err != nil {
-		log.Println("StopPigeonWork db.Ping failed with an error: ", err.Error())
-		return err
-	}
-
-	user, err := GetUserByName(userN, db)
-
-	if err != nil {
-		log.Println("StopPigeonWork GetUserByName failed with an error: ", err.Error())
-		return err
-	}
-
-	var botWork = []apitypes.BotWork{}
-	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE userid = $1", user.UserID)
-
-	if err != nil {
-		log.Println("StopPigeonWork db.Select failed with an error: ", err.Error())
-		return err
-	}
-
-	if len(botWork) == 1 {
-		tx := db.MustBegin()
-		tx.MustExec("UPDATE prj_botwork SET botworkflag = $1 WHERE botworkid = $2", false, botWork[0].BotWorkID)
-		tx.Commit()
-	}
-
-	if len(botWork) > 1 {
-		log.Printf("Больше двух флагов")
-		return err
-	}
-
-	return err
-}
-
-// CreatePigeonWorkFlag ...
-func CreatePigeonWorkFlag(userN string, db *sqlx.DB) error {
-	if err := db.Ping(); err != nil {
-		log.Println("CreatePigeonWorkFlag db.Ping failed with an error: ", err.Error())
-		return err
-	}
-
-	user, err := GetUserByName(userN, db)
-
-	if err != nil {
-		log.Println("CreatePigeonWorkFlag GetUserByName failed with an error: ", err.Error())
-		return err
-	}
-
-	var botWork = []apitypes.BotWork{}
-	err = db.Select(&botWork, "SELECT * FROM prj_botwork WHERE userid = $1", user.UserID)
-
-	if err != nil {
-		log.Println("CreatePigeonWorkFlag db.Select failed with an error: ", err.Error())
-		return err
-	}
-
-	if len(botWork) == 0 {
-
-		uuidWithHyphen := uuid.New()
-		uuid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
-
-		tx := db.MustBegin()
-		tx.MustExec(`INSERT INTO prj_botwork ("botworkid", "userid", "botworkflag") VALUES ($1, $2, $3)`,
-			uuid, user.UserID, true)
-		tx.Commit()
-
-		return err
-	}
-	log.Printf("Флаг уже создан")
-	return err
-}
-
-// SetLastComandUser ...
-func SetLastComandUser(userN string, db *sqlx.DB, command string) error {
-
-	if err := db.Ping(); err != nil {
-		log.Println("SetLastComandUser db.Ping failed with an error: ", err.Error())
-		return err
-	}
-
-	user, err := GetUserByName(userN, db)
-
-	if err != nil {
-		log.Println("SetLastComandUser GetUserByName failed with an error: ", err.Error())
-		return err
-	}
-
-	uuidWithHyphen := uuid.New()
-	uuid := strings.Replace(uuidWithHyphen.String(), "-", "", -1)
-	today := time.Now()
-	tTime := today.Add(10 * time.Minute).Format("2006/1/2 15:04")
-	tx := db.MustBegin()
-
-	tx.MustExec(`INSERT INTO prj_lastusercommand ("commandid", "userid", "command", "datacommand") VALUES ($1, $2, $3, $4)`,
-		uuid, user.UserID, command, tTime)
-	tx.Commit()
-
-	return err
-}
-
-// GetLastCommandByUserName ...
-func GetLastCommandByUserName(userN string, db *sqlx.DB) (*apitypes.LastUserCommand, error) {
-
-	if err := db.Ping(); err != nil {
-		return nil, errors.Wrap(err, "GetLastCommandByUserName db.Ping")
-	}
-
-	user, err := GetUserByName(userN, db)
-
-	if err != nil {
-		log.Println("GetLastCommandByUserName GetUserByName failed with an error: ", err.Error())
+	if err := RunInTransaction(ctx, api.db, work); err != nil {
 		return nil, err
 	}
 
-	if user == nil {
-		return nil, nil
-	}
-
-	var arrCommand = []apitypes.LastUserCommand{}
-
-	err = db.Select(&arrCommand, "SELECT * FROM prj_lastusercommand WHERE (userid = $1) ORDER BY datacommand DESC", user.UserID)
-
+	refCode, err := api.GetRefUserCodeByUserID(ctx, userID)
 	if err != nil {
-		log.Println("GetLastCommandByUserName db.Select failed with an error: ", err.Error())
-		return nil, err
+		return nil, errors.Wrap(err, "Get ref user code by key ID")
 	}
 
-	if len(arrCommand) == 0 {
-		return nil, nil
-	}
-
-	return &arrCommand[0], nil
+	return refCode, err
 }
 
-// DeleteLastCommand ...
-func DeleteLastCommand(userN string, command string, db *sqlx.DB) error {
-	if err := db.Ping(); err != nil {
-		log.Println("DeleteLastCommand db.Ping failed with an error: ", err.Error())
-		return err
-	}
+// GetRefUserCodeByKeyID ...
+func (api *API) GetRefUserCodeByUserID(ctx context.Context, userID string) (*apitypes.RefUserCode, error) {
+	return getRefUserCodeByUserID(ctx, api.db, userID)
+}
 
-	user, err := GetUserByName(userN, db)
+func getRefUserCodeByUserID(ctx context.Context, db TxContext, userID string) (*apitypes.RefUserCode, error) {
+	rowUserCode := apitypes.RefUserCode{}
 
+	queryRefCode := `SELECT ref_usercode.keyid, ref_usercode.codeid, ref_usercode.userid 
+	FROM ref_usercode WHERE ref_usercode.userid = $1 LIMIT 1;`
+
+	err := db.GetContext(ctx, &rowUserCode, queryRefCode, userID)
 	if err != nil {
-		log.Println("DeleteLastCommand GetUserByNamefailed with an error: ", err.Error())
-		return err
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Wrapf(err, "can't get ref_usercode by userid %s", userID)
+		}
 	}
-	tx := db.MustBegin()
-	tx.MustExec("DELETE FROM prj_lastusercommand WHERE userid = $1", user.UserID)
-	tx.Commit()
 
-	return nil
+	if rowUserCode.UserID == "" {
+		return nil, nil
+	}
+	return &rowUserCode, nil
 }
